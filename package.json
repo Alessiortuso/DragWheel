@@ -1,6 +1,6 @@
 {
   "name": "dragwheel",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Ruota radiale per Windows: trascina un file tenendo premuto un tasto e scegli come convertirlo o modificarlo (immagini, PDF, video, audio, fogli di calcolo, DOCX).",
   "author": "Alessio",
   "license": "MIT",
@@ -20,8 +20,9 @@
     "test:audio": "node tools/test-audio.js",
     "test:sheet": "node tools/test-sheet.js",
     "test:doc": "node tools/test-doc.js",
+    "test:separate": "node tools/test-separate.js && electron tools/test-audio-split-ui.js",
     "test:matrix": "node tools/test-matrix.js && electron tools/test-matrix-electron.js",
-    "test:all": "npm test && npm run test:audio && npm run test:video && npm run test:sheet && npm run test:doc && npm run test:matrix",
+    "test:all": "npm test && npm run test:audio && npm run test:video && npm run test:sheet && npm run test:doc && npm run test:matrix && npm run test:separate",
     "icon": "node tools/make-icon.js",
     "dist": "npm run get-models && electron-builder --win nsis"
   },

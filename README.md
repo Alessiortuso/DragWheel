@@ -10,8 +10,8 @@ Un'app per Windows che vive nell'area di notifica. Trascini un file e, tenendo p
 |---|---|---|
 | **Immagini** (PNG, JPG, WEBP, TIFF, AVIF, BMP, GIF, SVG) | verso tutti gli altri formati, PDF e DOCX | Ritaglia, Ridimensiona, Rimuovi sfondo (con editor a pennello) |
 | **PDF** | PNG, WEBP, JPG, TIFF, AVIF, BMP, GIF, DOCX (con testo e tabelle veri), TXT | |
-| **Video** (MP4, MOV, MKV, WEBM, AVI, WMV, FLV, MPG, TS…) | verso gli altri video, GIF e tutti i formati audio | Comprimi, Ridimensiona, Taglia, Fotogrammi |
-| **Audio** (MP3, M4A, WAV, FLAC, OGG, OPUS, AAC, AIFF, WMA) | verso tutti gli altri | Taglia (più parti insieme), Unisci in sequenza, Volume |
+| **Video** (MP4, MOV, MKV, WEBM, AVI, WMV, FLV, MPG, TS…) | verso gli altri video, GIF e tutti i formati audio | Comprimi, Ridimensiona, Taglia, Fotogrammi, Voce e musica |
+| **Audio** (MP3, M4A, WAV, FLAC, OGG, OPUS, AAC, AIFF, WMA) | verso tutti gli altri | Taglia (più parti insieme), Unisci in sequenza, Volume, **Voce e musica** (separa la voce dalla base strumentale, anche batteria, basso e altri strumenti) |
 | **Fogli di calcolo** (XLSX, XLS, ODS, CSV, TSV) | verso gli altri, JSON, HTML, PDF | Dividi, Unisci, Pulisci, Confronta |
 | **Documenti Word** (DOCX) | PDF, TXT, HTML, Markdown, immagini estratte | Unisci, Comprimi, Pulisci, Sostituisci |
 
@@ -32,7 +32,7 @@ Tutto avviene **sul tuo computer**: nessun file viene caricato online. I file or
 git clone <url-del-repository>
 cd DragWheel
 npm install
-npm run get-models    # scarica i modelli per "Rimuovi sfondo" (~300 MB, verificati con SHA-256)
+npm run get-models    # scarica i modelli per "Rimuovi sfondo" (~460 MB, verificati con SHA-256)
 npm start
 ```
 
@@ -50,7 +50,7 @@ Serve [Node.js](https://nodejs.org) 20 o superiore.
 npm run dist          # scarica i modelli se mancano e crea dist\DragWheel Setup x.y.z.exe
 ```
 
-L'installer pesa circa 450 MB perché include FFmpeg e i modelli di rimozione sfondo.
+L'installer pesa circa 600 MB perché include FFmpeg e i modelli di intelligenza artificiale (rimozione sfondo e separazione voce/musica).
 
 ## Test
 
@@ -78,6 +78,7 @@ I test generano da soli i file di cui hanno bisogno (in `tools/` ci sono anche s
 
 - Solo Windows. La conversione PDF → DOCX ricostruisce testo, titoli, elenchi e tabelle, ma non è identica all'originale; i PDF scansionati (senza testo) diventano immagini.
 - La rimozione dello sfondo con il modello "Preciso" può usare diversi GB di RAM per qualche secondo.
+- La separazione voce/musica impiega circa i due terzi della durata del brano su un portatile recente (un brano da 4 minuti richiede circa 3 minuti), usa circa 500 MB di RAM e restituisce audio stereo a 44,1 kHz.
 - Windows limita il trascinamento da e verso programmi avviati come amministratore: con quelli l'attivazione può non funzionare.
 
 ## Struttura
@@ -99,6 +100,7 @@ Il codice di DragWheel è rilasciato con licenza [MIT](LICENSE). Le dipendenze h
 - **FFmpeg** (`ffmpeg-static`, `@ffprobe-installer`): GPL-3.0. Se distribuisci l'installer, devi rispettare anche i termini della GPL per quei programmi.
 - **ISNet** (modello "Veloce"): Apache-2.0, dal progetto [DIS](https://github.com/xuebinqin/DIS), estratto dal pacchetto `@imgly/background-removal-node` (che ha la sua licenza: non è una dipendenza dell'app, serve solo a `npm run get-models`).
 - **BiRefNet lite** (modello "Preciso"): MIT, da [onnx-community/BiRefNet_lite-ONNX](https://huggingface.co/onnx-community/BiRefNet_lite-ONNX).
+- **HT-Demucs** (separazione voce/musica): MIT, [Meta / facebookresearch/demucs](https://github.com/facebookresearch/demucs), nell'esportazione ONNX di [adowu/htdemucs-onnx](https://huggingface.co/adowu/htdemucs-onnx).
 - Electron, sharp, pdf.js, SheetJS, ExcelJS, docx, mammoth, pdf-lib, onnxruntime-node: MIT, Apache-2.0 o BSD.
 
 ## English summary
