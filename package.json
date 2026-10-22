@@ -1,0 +1,101 @@
+{
+  "name": "dragwheel",
+  "version": "0.2.0",
+  "description": "Ruota radiale per Windows: trascina un file tenendo premuto un tasto e scegli come convertirlo o modificarlo (immagini, PDF, video, audio, fogli di calcolo, DOCX).",
+  "author": "Alessio",
+  "license": "MIT",
+  "private": true,
+  "main": "src/main.js",
+  "os": [
+    "win32"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "electron src/selftest-electron.js",
+    "get-models": "node tools/get-models.js",
+    "test:video": "node tools/test-video.js",
+    "test:audio": "node tools/test-audio.js",
+    "test:sheet": "node tools/test-sheet.js",
+    "test:doc": "node tools/test-doc.js",
+    "test:matrix": "node tools/test-matrix.js && electron tools/test-matrix-electron.js",
+    "test:all": "npm test && npm run test:audio && npm run test:video && npm run test:sheet && npm run test:doc && npm run test:matrix",
+    "icon": "node tools/make-icon.js",
+    "dist": "npm run get-models && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "@ffprobe-installer/ffprobe": "^2.1.2",
+    "@xmldom/xmldom": "^0.9.12",
+    "docx": "^9.13.0",
+    "exceljs": "^4.4.0",
+    "ffmpeg-static": "^5.3.0",
+    "mammoth": "^1.13.0",
+    "onnxruntime-node": "^1.30.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
+    "sharp": "^0.35.5",
+    "uiohook-napi": "^1.5.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.dragwheel.app",
+    "productName": "DragWheel",
+    "npmRebuild": false,
+    "publish": null,
+    "copyright": "Copyright (c) 2026 Alessio",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!**/*.map",
+      "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**",
+      "!node_modules/onnxruntime-node/bin/napi-v6/linux/**",
+      "!node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/@ffprobe-installer/**",
+      "node_modules/onnxruntime-node/**",
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+      "node_modules/uiohook-napi/**",
+      "src/doc/word.ps1"
+    ],
+    "extraResources": [
+      {
+        "from": "models",
+        "to": "models",
+        "filter": [
+          "*.onnx"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "DragWheel"
+    }
+  }
+}
