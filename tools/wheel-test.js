@@ -13,7 +13,7 @@ const SCENARI = {
   neutra: null, png: ['png'], pdf: ['pdf'], docx: ['docx'], 'docx+docx': ['docx', 'docx'], 'docx+pdf': ['docx', 'pdf'], 'png+pdf': ['png', 'pdf'], 'png+jpg': ['png', 'jpg'], sconosciuto: ['xyz'],
   mp4: ['mp4'], 'mp4+mov': ['mp4', 'mov'], 'mp4+png': ['mp4', 'png'],
   gif: ['gif'], tsv: ['tsv'], xlsx: ['xlsx'], 'xlsx+xlsx': ['xlsx', 'xlsx'], 'xlsx+3': ['xlsx', 'xlsx', 'xlsx'], 'csv(xls)': ['csv'],
-  mp3: ['mp3'], 'mp3+wav': ['mp3', 'wav'], 'mp3+mp4': ['mp3', 'mp4'],
+  mp3: ['mp3'], 'mp3+mp4': ['mp3', 'mp4'], 'mp3+wav': ['mp3', 'wav'], 'mp3+mp4': ['mp3', 'mp4'],
   'png-hot': { t: ['png'], hot: 3, hotCenter: 1 }, 'mp4-hot': { t: ['mp4'], hot: 2, hotCenter: 2 },
 };
 

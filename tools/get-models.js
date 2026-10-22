@@ -2,6 +2,7 @@
 //  - isnet_medium.onnx  (Veloce)  modello ISNet (Apache-2.0, https://github.com/xuebinqin/DIS), preso dal pacchetto npm
 //                                 @imgly/background-removal-node, che si scarica solo qui in una cartella temporanea
 //  - birefnet_lite.onnx (Preciso) scaricato da Hugging Face, onnx-community/BiRefNet_lite-ONNX (MIT)
+//  - htdemucs.onnx (separazione voce/musica) HT-Demucs di Meta (MIT), esportato in ONNX: Hugging Face, adowu/htdemucs-onnx
 // Ogni file è verificato con il suo SHA-256: se non coincide viene scartato.
 const fs = require('fs');
 const os = require('os');
@@ -16,6 +17,7 @@ fs.mkdirSync(DIR, { recursive: true });
 const MODELS = {
   'isnet_medium.onnx': { sha256: 'b6e8497ba978a6f5fbb647e419d2696cd80df5a23cb6a8ea532021911bd76acb' },
   'birefnet_lite.onnx': { sha256: '5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333', url: 'https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx' },
+  'htdemucs.onnx': { sha256: 'd05c269d0178d2a72ad484b10b11dd370193fc923201c3b27a99f848745db70a', url: 'https://huggingface.co/adowu/htdemucs-onnx/resolve/main/htdemucs_fp16weights.onnx' },
 };
 const IMGLY = '@imgly/background-removal-node@1.4.5';
 
