@@ -1,0 +1,42 @@
+// Verifica l'allineamento percentuale <-> pixel e l'attenuazione della scheda non attiva
+const { app, BrowserWindow } = require('electron');
+const fs = require('fs'), os = require('os'), path = require('path');
+const sharp = require('sharp');
+const { openTool } = require('../src/tools');
+
+app.whenReady().then(async () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-'));
+  const f = path.join(d, 'a.png');
+  await sharp({ create: { width: 4000, height: 3000, channels: 3, background: '#3b82f6' } }).png().toFile(f);
+  await openTool('resize', [f]);
+  const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+  const ev = (c) => win.webContents.executeJavaScript(c);
+  const run = (c) => ev(`(() => { ${c} })(); 0`);
+  const st = () => ev(`[mode, 'pct=' + $('pct').value, 'px=' + $('w').value + 'x' + $('h').value, 'chip=' + [...document.querySelectorAll('[data-p].on')].map((b) => b.dataset.p), 'dim=' + (getComputedStyle($('cardS')).opacity) + '/' + (getComputedStyle($('cardP')).opacity), 'hint=' + $('pHint').textContent].join(' | ')`);
+  const wait = (ms = 300) => new Promise((r) => setTimeout(r, ms));
+  await wait(600);
+  console.log('iniziale        ', await st());
+  await run(`document.querySelector('[data-p="25"]').click()`); await wait();
+  console.log('chip 25%        ', await st());
+  await run(`const i = $('pct'); i.value = 33; i.dispatchEvent(new Event('input'))`); await wait();
+  console.log('altro 33%       ', await st());
+  await run(`const i = $('w'); i.value = 2000; i.dispatchEvent(new Event('input'))`); await wait();
+  console.log('W=2000          ', await st());
+  await run(`const i = $('h'); i.value = 600; i.dispatchEvent(new Event('input'))`); await wait();
+  console.log('H=600           ', await st());
+  await run(`$('lock').checked = false; $('lock').dispatchEvent(new Event('change')); const i = $('w'); i.value = 1000; i.dispatchEvent(new Event('input'))`); await wait();
+  console.log('sblocca W=1000  ', await st());
+  await run(`$('cardP').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`); await wait();
+  console.log('clic su % (vuota)', await st());
+  await run(`document.querySelector('[data-p="50"]').click()`); await wait();
+  console.log('chip 50%        ', await st());
+  await run(`$('cardS').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`); await wait();
+  console.log('clic su pixel   ', await st());
+  fs.writeFileSync(process.argv[2], (await win.webContents.capturePage()).toPNG());
+  await run(`document.querySelector('[data-p="50"]').click(); apply()`); await wait(1000);
+  const out = fs.readdirSync(d).find((n) => n.includes('Resized'));
+  const m = await sharp(path.join(d, out)).metadata();
+  console.log('applica 50%     ', m.width + 'x' + m.height);
+  app.exit(0);
+});
+app.on('window-all-closed', () => {});
