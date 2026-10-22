@@ -29,15 +29,15 @@
   const IMG_TARGETS = ['png', 'webp', 'jpg', 'tiff', 'avif', 'bmp', 'gif', 'pdf', 'docx'];
   const VIDEO_TARGETS = ['mp4', 'mov', 'mkv', 'webm', 'avi', 'gif', 'mp3', 'wav']; // gli altri formati (WMV, FLV, FLAC, OGG...) si scelgono con ALTRO nella finestra
   const IMG_ACTIONS = ['crop', 'resize', 'removebg'];
-  const VID_ACTIONS = ['vid:compress', 'vid:resize', 'vid:cut', 'vid:frames'];
+  const VID_ACTIONS = ['vid:compress', 'vid:resize', 'vid:cut', 'vid:frames', 'aud:split']; // aud:split = separa voce e musica dall'audio del video
   const AUDIO_TARGETS = ['mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus', 'aac', 'aiff', 'wma'];
-  const AUD_ACTIONS = ['aud:cut', 'aud:merge', 'aud:volume'];
+  const AUD_ACTIONS = ['aud:cut', 'aud:merge', 'aud:volume', 'aud:split'];
   const SHEET_TARGETS = ['xlsx', 'xls', 'ods', 'csv', 'tsv', 'json', 'html', 'pdf'];
   const XL_ACTIONS = ['xl:split', 'xl:merge', 'xl:clean', 'xl:diff'];
   const DOC_TARGETS = ['pdf', 'txt', 'html', 'md', 'images'];
   const DX_ACTIONS = ['dx:merge', 'dx:compress', 'dx:clean', 'dx:replace'];
   const SINGLE_ONLY = new Set(['crop', 'vid:cut', 'vid:frames', 'aud:cut']); // azioni che lavorano su un file alla volta
-  const LABEL = { crop: 'Ritaglia', resize: 'Ridimensiona', removebg: 'Rimuovi\nsfondo', 'vid:compress': 'Comprimi', 'vid:resize': 'Ridimensiona', 'vid:cut': 'Taglia', 'vid:frames': 'Fotogrammi', 'aud:cut': 'Taglia', 'aud:merge': 'Unisci', 'aud:volume': 'Volume', 'xl:split': 'Dividi', 'xl:merge': 'Unisci', 'xl:clean': 'Pulisci', 'xl:diff': 'Confronta', 'dx:merge': 'Unisci', 'dx:compress': 'Comprimi', 'dx:clean': 'Pulisci', 'dx:replace': 'Sostituisci' };
+  const LABEL = { crop: 'Ritaglia', resize: 'Ridimensiona', removebg: 'Rimuovi\nsfondo', 'vid:compress': 'Comprimi', 'vid:resize': 'Ridimensiona', 'vid:cut': 'Taglia', 'vid:frames': 'Fotogrammi', 'aud:cut': 'Taglia', 'aud:merge': 'Unisci', 'aud:volume': 'Volume', 'aud:split': 'Voce e\nmusica', 'xl:split': 'Dividi', 'xl:merge': 'Unisci', 'xl:clean': 'Pulisci', 'xl:diff': 'Confronta', 'dx:merge': 'Unisci', 'dx:compress': 'Comprimi', 'dx:clean': 'Pulisci', 'dx:replace': 'Sostituisci' };
   const T = (id) => ({ id, label: id.toUpperCase() });
   const vt = (t) => ({ id: 'vid:convert:' + t, label: t.toUpperCase() });
   const at = (t) => ({ id: 'aud:convert:' + t, label: t.toUpperCase() });
@@ -84,7 +84,7 @@
     return {
       label: [...new Set(kinds)].map((k) => k.toUpperCase()).join(' + '),
       targets: all[0].targets.filter((t) => all.every((o) => o.targets.some((x) => x.id === t.id))),
-      actions: [...IMG_ACTIONS, ...VID_ACTIONS, ...AUD_ACTIONS, ...XL_ACTIONS, ...DX_ACTIONS].filter((a) => all.every((o) => o.actions.includes(a)) && (!SINGLE_ONLY.has(a) || count === 1) && (a !== 'xl:diff' || count === 2)),
+      actions: all[0].actions.filter((a) => all.every((o) => o.actions.includes(a)) && (!SINGLE_ONLY.has(a) || count === 1) && (a !== 'xl:diff' || count === 2)),
     };
   }
   const optionsForTypes = (mimes) => optionsForKinds(mimes.map((m) => KIND_BY_MIME[m]).filter(Boolean), mimes.length);
@@ -143,6 +143,7 @@
     'xl:diff': ['M18 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6z', 'M6 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6z', 'M13 6h3a2 2 0 0 1 2 2v7', 'M11 18H8a2 2 0 0 1-2-2V9'],
     'aud:cut': ['M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M20 4L8.1 15.9', 'M14.5 14.5L20 20', 'M8.1 8.1L12 12'],
     'aud:merge': ['M11 12H3', 'M16 6H3', 'M16 18H3', 'M18 9v6', 'M21 12h-6'],
+    'aud:split': ['M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z', 'M19 10v1a7 7 0 0 1-14 0v-1', 'M12 18v4', 'M8 22h8'],
     'aud:volume': ['M11 5L6 9H2v6h4l5 4V5z', 'M15.5 8.5a5 5 0 0 1 0 7', 'M19 5a10 10 0 0 1 0 14'],
     'vid:frames': ['M4 7.5h3l1.8-2.5h6.4L17 7.5h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z', 'M12 16.2a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2z'],
   };

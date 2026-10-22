@@ -64,7 +64,7 @@
 </style>
 
 <header><strong>Audio</strong><span id="info"></span></header>
-<nav id="tabs"><button data-op="convert">Converti</button><button data-op="cut">Taglia</button><button data-op="merge">Unisci</button><button data-op="volume">Volume</button></nav>
+<nav id="tabs"><button data-op="convert">Converti</button><button data-op="cut">Taglia</button><button data-op="merge">Unisci</button><button data-op="volume">Volume</button><button data-op="split">Voce / musica</button></nav>
 
 <main>
   <div id="left">
@@ -137,6 +137,20 @@
       <label class="row"><input type="checkbox" id="vTrim"><span><b>Taglia il silenzio</b> all’inizio e alla fine</span></label>
       <div class="out" data-p="volume"></div>
       <div class="note">Il file originale non viene toccato: il risultato è un nuovo file “… (modificato)”.</div>
+    </section>
+
+    <!-- VOCE / MUSICA -->
+    <section class="pane" data-op="split">
+      <h2>Cosa vuoi ottenere</h2>
+      <label class="row"><input type="checkbox" id="spVoc" checked><span><b>Solo la voce</b><br><span class="note">Acapella: il canto o il parlato, senza la base.</span></span></label>
+      <label class="row"><input type="checkbox" id="spMus" checked><span><b>Solo la musica</b><br><span class="note">Base strumentale, senza la voce (utile per il karaoke).</span></span></label>
+      <h2>Parti separate (facoltativo)</h2>
+      <label class="row"><input type="checkbox" id="spDrums"><span>Batteria</span></label>
+      <label class="row"><input type="checkbox" id="spBass"><span>Basso</span></label>
+      <label class="row"><input type="checkbox" id="spOther"><span>Altri strumenti (chitarre, tastiere, archi…)</span></label>
+      <div class="out" data-p="split"></div>
+      <div class="note" id="spNote"></div>
+      <div class="note">Funziona in locale con un modello di intelligenza artificiale (HT-Demucs): il brano non viene caricato online. Il risultato è in stereo a 44,1 kHz. Non è magia: su registrazioni difficili restano piccole tracce della voce o della musica.</div>
     </section>
 
     <div id="result"></div>
@@ -395,7 +409,7 @@
   $('playSel').addEventListener('click', () => { const r = reg(selId) || regions[0]; if (r) playRange(r.start, r.end); });
 
   // ---------------- schede ----------------
-  const OPS = { convert: 'Converti', cut: 'Taglia', merge: 'Unisci', volume: 'Applica' };
+  const OPS = { convert: 'Converti', cut: 'Taglia', merge: 'Unisci', volume: 'Applica', split: 'Separa' };
   function setOp(o) {
     op = o;
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.op === o));
@@ -406,7 +420,11 @@
     $('playSel').style.display = o === 'cut' ? '' : 'none';
     $('result').innerHTML = ''; $('msg').textContent = '';
     if (view_ === 'waveView') { resizeCanvas(); if (o === 'cut' && !regions.length && dur) addRegion(dur * 0.25, dur * 0.5); }
-    updateCutOpts(); updateMergeSummary();
+    updateCutOpts(); updateMergeSummary(); splitNote();
+  }
+  function splitNote() {
+    const mins = single && P && P.duration ? P.duration * 0.7 / 60 : 0;
+    $('spNote').textContent = op !== 'split' ? '' : single ? `Tempo stimato: ${mins < 1 ? 'meno di un minuto' : 'circa ' + Math.ceil(mins) + (Math.ceil(mins) === 1 ? ' minuto' : ' minuti')} (dipende dal computer). Puoi continuare a usare il PC, ma il processore sarà molto impegnato.` : 'Ogni file richiede circa i due terzi della sua durata (dipende dal computer).';
   }
   document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => !running && setOp(b.dataset.op)));
 
@@ -466,15 +484,20 @@
       const jm = document.querySelector('[name=jmode]:checked').value;
       return { files: mlist.filter((m) => !m.probe.error).map((m) => m.path), joinMode: jm, gap: num($('mGap').value) || 0, crossfade: num($('mXf').value) || 0, title: $('mTitle').value.trim(), ...readOut('merge') };
     }
+    if (op === 'split') {
+      const targets = [['spVoc', 'vocals'], ['spMus', 'music'], ['spDrums', 'drums'], ['spBass', 'bass'], ['spOther', 'other']].filter(([id]) => $(id).checked).map(([, t]) => t);
+      if (!targets.length) throw new Error('Scegli almeno un risultato.');
+      return { targets, ...readOut('split') };
+    }
     const fi = num($('vFi').value) || 0, fo = num($('vFo').value) || 0;
     return { normalize: $('vNorm').checked, gainDb: +$('vGain').value, fadeIn: fi, fadeOut: fo, speed: +$('vSpeed').value, trimSilence: $('vTrim').checked, ...readOut('volume') };
   }
   let t0 = 0;
-  window.audio.onProgress(({ index, total, p }) => {
+  window.audio.onProgress(({ index, total, p, stage }) => {
     const all = (index + p) / total;
     $('pbar').style.width = Math.round(all * 100) + '%';
     const el = (Date.now() - t0) / 1000, eta = all > 0.03 ? el / all - el : null;
-    $('ptxt').textContent = `${Math.round(all * 100)}%${eta !== null && eta > 1 ? ` · circa ${fmtShort(eta)} rimanenti` : ''}${total > 1 ? ` · file ${index + 1} di ${total}` : ''}`;
+    $('ptxt').textContent = `${stage ? stage + ' · ' : ''}${Math.round(all * 100)}%${eta !== null && eta > 1 ? ` · circa ${fmtShort(eta)} rimanenti` : ''}${total > 1 ? ` · file ${index + 1} di ${total}` : ''}`;
     if (!single && op !== 'merge') { const row = $('f' + index); if (row) { row.querySelector('.bar i').style.width = Math.round(p * 100) + '%'; row.querySelector('.st').textContent = Math.round(p * 100) + '%'; } }
   });
   function setRunning(v) {
@@ -548,7 +571,7 @@
       $('files').innerHTML = f.map((x, i) => `<div class="f" id="f${i}"><span></span><span class="st">in attesa</span><small>${pr[i].error ? '' : `${fmtShort(pr[i].duration)} · ${pr[i].acodec || ''} · ${fmtB(pr[i].size)}`}</small><span></span><div class="bar"><i></i></div></div>`).join('');
       f.forEach((x, i) => { $('f' + i).querySelector('span').textContent = names[i]; if (pr[i].error) { $('f' + i).classList.add('err'); $('f' + i).querySelector('small').textContent = pr[i].error; } });
     }
-    const m = /^aud:(convert|cut|merge|volume)(?::(\w+))?$/.exec(preset || '');
+    const m = /^aud:(convert|cut|merge|volume|split)(?::(\w+))?$/.exec(preset || '');
     let start = m ? m[1] : 'convert';
     if (!single && start === 'cut') start = 'convert';
     if (m && m[1] === 'convert' && m[2]) $('cvTarget').value = m[2];

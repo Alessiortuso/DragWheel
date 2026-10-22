@@ -5,6 +5,8 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const ff = require('./video/ffmpeg');
 const jobs = require('./audio/jobs');
+const separation = require('./audio/separation/client');
+const splitPlan = require('./audio/separation/plan').plan;
 const guard = require('./ipc-guard');
 const { glassOptions } = require('./window-style');
 
@@ -14,7 +16,7 @@ const sessions = new Map(); // id webContents -> { files, probes, preset, runnin
 const sizeOf = (p) => fs.statSync(p).size;
 const withUrl = (f) => ff.probe(f).then((p) => ({ ...p, url: pathToFileURL(f).href }), (e) => ({ error: e.message }));
 
-// preset: id scelto nella ruota, es. "aud:convert:mp3", "aud:cut", "aud:merge", "aud:volume"
+// preset: id scelto nella ruota, es. "aud:convert:mp3", "aud:cut", "aud:merge", "aud:volume", "aud:split"
 async function openAudioTool(files, preset) {
   const probes = await Promise.all(files.map(withUrl));
   if (probes.every((p) => p.error)) throw new Error(probes[0].error);
@@ -57,8 +59,15 @@ ipcMain.handle('audio:run', async (e, op, options) => {
   const results = [];
   let cancelled = false;
   s.running = { cancel: () => { cancelled = true; s.cancelCurrent && s.cancelCurrent(); } };
-  const send = (i, total, p) => e.sender.send('audio:progress', { index: i, total, p });
+  const send = (i, total, p, stage) => e.sender.send('audio:progress', { index: i, total, p, stage });
   const one = async (input, probe, i, total) => {
+    if (op === 'split') { // separazione voce / musica: processo dedicato
+      if (probe && !probe.hasAudio) throw new Error('il file non contiene audio');
+      const h = separation.run(splitPlan(input, options), (stage, p) => send(i, total, p, stage));
+      s.cancelCurrent = h.cancel;
+      const outputs = await h.promise;
+      return { outputs, sizes: outputs.map(sizeOf) };
+    }
     const plan = jobs.plan(op, input, probe, options);
     const h = jobs.execute(plan, (v) => send(i, total, v));
     s.cancelCurrent = h.cancel;
