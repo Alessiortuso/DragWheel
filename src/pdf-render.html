@@ -1,0 +1,128 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; script-src 'self' file: 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: data: blob:; worker-src 'self' file: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<script type="module">
+import * as pdfjs from '../node_modules/pdfjs-dist/build/pdf.mjs';
+pdfjs.GlobalWorkerOptions.workerSrc = '../node_modules/pdfjs-dist/build/pdf.worker.mjs';
+
+// Restituisce un array di PNG (base64) una per pagina
+window.renderPdf = async (b64) => {
+  const bin = atob(b64);
+  const data = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
+  const doc = await pdfjs.getDocument({ data }).promise;
+  const out = [];
+  for (let n = 1; n <= doc.numPages; n++) {
+    const page = await doc.getPage(n);
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    out.push(canvas.toDataURL('image/png').split(',')[1]);
+  }
+  await doc.destroy();
+  return out;
+};
+
+const b64ToBytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
+// Cerca figure (immagini, grafici vettoriali): renderizza la pagina, cancella il testo e raggruppa ciò che resta.
+// Restituisce regioni con la PNG ritagliata; le regioni sovrapposte a tabelle le scarta il chiamante (layout.js).
+async function findFigures(page, items, pageH) {
+  const SCALE = 2, CELL = 8, REACH = 2;
+  const vp = page.getViewport({ scale: SCALE });
+  const W = Math.ceil(vp.width), H = Math.ceil(vp.height);
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  const rects = items.map((it) => {
+    const [x1, y1, x2, y2] = vp.convertToViewportRectangle([it.x, it.y - 0.3 * it.size, it.x + it.w, it.y + it.size]);
+    return { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+  });
+  const mask = document.createElement('canvas'); mask.width = W; mask.height = H;
+  const mctx = mask.getContext('2d', { willReadFrequently: true });
+  mctx.drawImage(canvas, 0, 0);
+  mctx.fillStyle = '#fff';
+  for (const r of rects) mctx.fillRect(r.x - 3, r.y - 3, r.w + 6, r.h + 6);
+  const { data } = mctx.getImageData(0, 0, W, H);
+  const gw = Math.ceil(W / CELL), gh = Math.ceil(H / CELL), grid = new Uint8Array(gw * gh);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) grid[((y / CELL) | 0) * gw + ((x / CELL) | 0)] = 1;
+  }
+  // Raggruppa le celle accese: due celle sono dello stesso blocco se distano al più `reach` celle
+  const label = (reach) => {
+    const seen = new Uint8Array(gw * gh), comps = [];
+    for (let s = 0; s < grid.length; s++) {
+      if (!grid[s] || seen[s]) continue;
+      const c = { x0: gw, y0: gh, x1: 0, y1: 0, cells: [] }; const stack = [s]; seen[s] = 1;
+      while (stack.length) {
+        const k = stack.pop(), cx = k % gw, cy = (k / gw) | 0;
+        c.cells.push(k); c.x0 = Math.min(c.x0, cx); c.x1 = Math.max(c.x1, cx); c.y0 = Math.min(c.y0, cy); c.y1 = Math.max(c.y1, cy);
+        for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= gw || ny >= gh) continue;
+          const n = ny * gw + nx;
+          if (grid[n] && !seen[n]) { seen[n] = 1; stack.push(n); }
+        }
+      }
+      comps.push({ ...c, bx: c.x0 * CELL, by: c.y0 * CELL, bw: Math.min(W, (c.x1 + 1) * CELL) - c.x0 * CELL, bh: Math.min(H, (c.y1 + 1) * CELL) - c.y0 * CELL });
+    }
+    return comps;
+  };
+
+  // 1) pallini degli elenchi: Chrome li disegna come grafica, non come testo. Un blocco piccolo subito a sinistra
+  //    dell'inizio di una riga è un punto elenco: lo segno sulla riga e lo tolgo prima di cercare le figure.
+  for (const m of label(1)) {
+    if (m.bw > 24 || m.bh > 24 || m.bw < 4 || m.bh < 4) continue;
+    const right = (m.bx + m.bw) / SCALE, my = pageH - (m.by + m.bh / 2) / SCALE;
+    const it = items.filter((i) => right <= i.x + 1 && i.x - right < 30 && my > i.y - 0.4 * i.size && my < i.y + 1.1 * i.size)
+      .sort((a, b) => a.x - b.x)[0];
+    if (it) { it.bullet = true; for (const k of m.cells) grid[k] = 0; }
+  }
+
+  // 2) figure: blocchi grandi senza troppo testo sopra
+  const figures = [];
+  for (const m of label(2)) {
+    const { bx, by, bw, bh } = m;
+    if (bw < 48 || bh < 48 || bw * bh > 0.85 * W * H) continue;
+    let textArea = 0;
+    for (const r of rects) if (r.x + r.w / 2 >= bx && r.x + r.w / 2 <= bx + bw && r.y + r.h / 2 >= by && r.y + r.h / 2 <= by + bh) textArea += r.w * r.h;
+    if (textArea / (bw * bh) > 0.35) continue; // pannello colorato con testo: non è una figura
+    const px = Math.max(0, bx - 4), py = Math.max(0, by - 4), pw = Math.min(W - px, bw + 8), ph = Math.min(H - py, bh + 8);
+    const crop = document.createElement('canvas'); crop.width = pw; crop.height = ph;
+    crop.getContext('2d').drawImage(canvas, px, py, pw, ph, 0, 0, pw, ph);
+    figures.push({ x: px / SCALE, top: pageH - py / SCALE, w: pw / SCALE, h: ph / SCALE, png: crop.toDataURL('image/png').split(',')[1] });
+  }
+  return figures;
+}
+
+// Dati grezzi per pagina: testo con posizione e stile + figure. L'impaginazione si ricostruisce in layout.js
+window.extractPdf = async (b64) => {
+  const doc = await pdfjs.getDocument({ data: b64ToBytes(b64) }).promise;
+  const pages = [];
+  for (let n = 1; n <= doc.numPages; n++) {
+    const page = await doc.getPage(n);
+    await page.getOperatorList(); // carica i font, così se ne conosce il nome (grassetto/corsivo)
+    const tc = await page.getTextContent();
+    const fonts = {};
+    const style = (fontName) => fonts[fontName] ??= (() => {
+      let name = '';
+      try { name = page.commonObjs.get(fontName).name || ''; } catch {}
+      return { bold: /bold|black|heavy|semibold/i.test(name), italic: /italic|oblique/i.test(name) };
+    })();
+    const items = tc.items.filter((i) => i.str !== undefined && i.str !== '' && Math.abs(i.transform[1]) < 0.01)
+      .map((i) => ({ str: i.str, x: i.transform[4], y: i.transform[5], size: Math.hypot(i.transform[2], i.transform[3]) || i.height, w: i.width, ...style(i.fontName) }));
+    const { width, height } = page.getViewport({ scale: 1 });
+    pages.push({ width, height, items, figures: await findFigures(page, items.filter((i) => i.str.trim()), height) });
+  }
+  await doc.destroy();
+  return pages;
+};
+window.ready = true;
+</script>

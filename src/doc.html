@@ -1,0 +1,259 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; script-src 'self' file: 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: data: blob:; worker-src 'self' file: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Documenti Word</title>
+<link rel="stylesheet" href="tool.css">
+<script src="tool-chrome.js"></script>
+<style>
+  body { padding: 0; gap: 0; overflow: hidden; }
+  header { padding: 10px 16px 0; display: flex; align-items: baseline; gap: 12px; }
+  header strong { font-size: 15px; }
+  #info { font-size: 12.5px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  nav { display: flex; gap: 4px; padding: 10px 16px 0; border-bottom: 1px solid var(--line); }
+  nav button { border: 0; border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0; padding: 8px 14px; background: transparent; }
+  nav button.on { background: transparent; color: inherit; border-bottom-color: var(--accent); font-weight: 700; }
+  main { flex: 1; min-height: 0; display: flex; }
+  #left { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 14px 16px; gap: 10px; }
+  #right { width: 360px; border-left: 1px solid var(--line); padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .view { display: none; flex: 1; min-height: 0; flex-direction: column; gap: 10px; }
+  .view.on { display: flex; }
+  #stats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stat { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 6px 12px; font-size: 12.5px; display: flex; flex-direction: column; }
+  .stat b { font-size: 15px; } .stat span { opacity: .6; }
+  #preview { flex: 1; min-height: 0; overflow: auto; white-space: pre-wrap; background: rgba(255, 255, 255, .55); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; font: 13px/1.55 'Segoe UI', sans-serif; }
+  #files, #mlist { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .f, .mrow { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+  .f { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; } .f small, .mrow small { opacity: .65; } .f .st { text-align: right; opacity: .8; }
+  .f.err { border-color: #c0260d; } .f.ok .st::before { content: '✓ '; color: #2a9a3a; }
+  .mrow { display: flex; align-items: center; gap: 10px; cursor: grab; } .mrow.over { outline: 2px dashed var(--accent); }
+  .mrow .grip { opacity: .45; font-size: 16px; } .mrow .num { width: 22px; text-align: right; opacity: .6; }
+  .mrow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; } .mrow button { padding: 2px 8px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  section.pane { display: none; flex-direction: column; gap: 12px; } section.pane.on { display: flex; }
+  h2 { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .6; margin: 0; font-weight: 700; }
+  .fld { display: flex; flex-direction: column; align-items: stretch; gap: 5px; font-size: 13px; } .fld select { width: 100%; }
+  label.row { display: flex; gap: 8px; align-items: flex-start; flex-wrap: nowrap; } .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .note { font-size: 12.5px; opacity: .7; line-height: 1.45; } .note.warn { color: #b8620a; opacity: 1; }
+  .radio { display: flex; flex-direction: column; gap: 8px; }
+  .card { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .card.err { border-color: #c0260d; color: #b0200a; }
+  #pairs { display: flex; flex-direction: column; gap: 6px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; } .pair input { min-width: 0; }
+  .pair button { padding: 2px 8px; }
+  footer { border-top: 1px solid var(--line); padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+  #msg { font-size: 13px; opacity: .85; }
+</style>
+
+<header><strong>Documenti Word</strong><span id="info"></span></header>
+<nav id="tabs"><button data-op="convert">Converti</button><button data-op="merge">Unisci</button><button data-op="compress">Comprimi</button><button data-op="clean">Pulisci</button><button data-op="replace">Sostituisci</button></nav>
+
+<main>
+  <div id="left">
+    <div class="view" id="docView">
+      <div id="stats"></div>
+      <div id="preview"></div>
+      <div class="note" id="pvNote"></div>
+    </div>
+    <div class="view" id="listView"><div id="files"></div></div>
+    <div class="view" id="mergeView">
+      <div class="toolbar"><button id="mAdd">Aggiungi documenti…</button><button id="mSort">Ordina per nome</button><button id="mClear">Svuota</button><div class="sp"></div><span class="note" id="mSum"></span></div>
+      <div id="mlist"></div>
+      <div class="note">Trascina le righe per cambiare l’ordine: il risultato segue questa sequenza, dall’alto in basso.</div>
+    </div>
+  </div>
+
+  <div id="right">
+    <!-- CONVERTI -->
+    <section class="pane" data-op="convert">
+      <label class="fld"><span>Converti in</span><select id="cvTarget">
+        <option value="pdf">PDF</option><option value="txt">TXT (solo testo)</option><option value="html">HTML (pagina web)</option><option value="md">MD (Markdown)</option><option value="images">Immagini contenute nel documento</option>
+      </select></label>
+      <div class="note" id="cvNote"></div>
+    </section>
+
+    <!-- UNISCI -->
+    <section class="pane" data-op="merge">
+      <label class="row"><input type="checkbox" id="mBreak" checked><span>Ogni documento inizia su una <b>nuova pagina</b></span></label>
+      <div class="note warn" id="mWord"></div>
+      <div class="note">Il risultato è un nuovo documento “… (unione)”, con l’impaginazione di ciascuno.</div>
+    </section>
+
+    <!-- COMPRIMI -->
+    <section class="pane" data-op="compress">
+      <h2>Qualità delle immagini</h2>
+      <div class="radio">
+        <label class="row"><input type="radio" name="clevel" value="high"><span><b>Alta</b><br><span class="note">Ridimensiona solo le immagini enormi. Differenza quasi invisibile.</span></span></label>
+        <label class="row"><input type="radio" name="clevel" value="balanced" checked><span><b>Bilanciata</b><br><span class="note">Va bene per leggere a schermo e per inviare via email.</span></span></label>
+        <label class="row"><input type="radio" name="clevel" value="small"><span><b>Massima compressione</b><br><span class="note">Il file più leggero possibile; le immagini perdono dettaglio.</span></span></label>
+      </div>
+      <div class="note" id="cpNote"></div>
+      <div class="note">Il testo e l’impaginazione non cambiano. Il risultato è “… (compresso)”.</div>
+    </section>
+
+    <!-- PULISCI -->
+    <section class="pane" data-op="clean">
+      <h2>Prima di inviare il documento</h2>
+      <label class="row"><input type="checkbox" id="clComments" checked><span>Elimina i <b>commenti</b></span></label>
+      <label class="row"><input type="checkbox" id="clChanges" checked><span><b>Accetta le modifiche</b> registrate (il testo cancellato sparisce, quello aggiunto resta)</span></label>
+      <label class="row"><input type="checkbox" id="clPrivacy" checked><span>Togli <b>autore, società</b> e altre informazioni personali</span></label>
+      <div class="note" id="clNote"></div>
+      <div class="note">Il documento originale non viene toccato: il risultato è “… (pulito)”.</div>
+    </section>
+
+    <!-- SOSTITUISCI -->
+    <section class="pane" data-op="replace">
+      <h2>Trova e sostituisci</h2>
+      <div id="pairs"></div>
+      <div class="row"><button id="pAdd">+ Aggiungi coppia</button></div>
+      <label class="row"><input type="checkbox" id="rCase"><span>Rispetta <b>maiuscole e minuscole</b></span></label>
+      <div class="note">Trova il testo anche nell’intestazione, nel piè di pagina e quando ha formattazioni diverse al suo interno. Lascia vuoto “Sostituisci con” per cancellarlo. Il risultato è “… (sostituito)”.</div>
+    </section>
+
+    <div id="result"></div>
+  </div>
+</main>
+
+<footer>
+  <div id="msg"></div><div class="sp"></div>
+  <button id="close">Chiudi</button><button id="go" class="primary">Converti</button>
+</footer>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const name = (p) => String(p).split(/[\\/]/).pop();
+  const fmtB = (b) => (b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB').replace('.', ',');
+  const cleanErr = (e) => String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+
+  let files = [], op = 'convert', running = false, info = null, mlist = [], hasWord = false;
+  const single = () => files.length === 1;
+
+  // ---------------- anteprima ----------------
+  function stat(box, v, l) { const d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<b></b><span></span>'; d.firstChild.textContent = v; d.lastChild.textContent = l; box.append(d); }
+  function renderDoc() {
+    const st = $('stats'); st.innerHTML = '';
+    if (!info) { $('preview').textContent = 'Leggo il documento…'; return; }
+    if (info.error) { $('preview').textContent = info.error; $('pvNote').textContent = ''; return; }
+    stat(st, fmtB(info.size), 'dimensione'); stat(st, info.words.toLocaleString('it-IT'), 'parole');
+    stat(st, info.images, info.images === 1 ? 'immagine' : 'immagini'); stat(st, info.comments, info.comments === 1 ? 'commento' : 'commenti'); stat(st, info.revisions, info.revisions === 1 ? 'modifica registrata' : 'modifiche registrate');
+    if (info.author || info.lastModifiedBy) stat(st, info.author || info.lastModifiedBy, 'autore');
+    $('preview').textContent = info.preview || '(il documento non contiene testo)';
+    $('pvNote').textContent = info.chars > info.preview.length + 20 ? 'Anteprima: solo l’inizio del documento.' : '';
+    $('cpNote').textContent = info.images ? `Immagini nel documento: ${info.images} (${fmtB(info.imageBytes)}).` : 'Il documento non contiene immagini: non c’è niente da comprimere.';
+    $('clNote').textContent = `Nel documento: ${info.comments} ${info.comments === 1 ? 'commento' : 'commenti'}, ${info.revisions} ${info.revisions === 1 ? 'modifica registrata' : 'modifiche registrate'}${info.author ? ', autore “' + info.author + '”' : ''}.`;
+  }
+  async function loadInfo() { info = null; renderDoc(); info = await window.doc.inspect(files[0]); renderDoc(); }
+
+  // ---------------- schede ----------------
+  const GO = { convert: 'Converti', merge: 'Unisci', compress: 'Comprimi', clean: 'Pulisci', replace: 'Sostituisci' };
+  function setOp(o) {
+    op = o;
+    document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.op === o));
+    document.querySelectorAll('section.pane').forEach((s) => s.classList.toggle('on', s.dataset.op === o));
+    $('go').textContent = GO[o];
+    const v = o === 'merge' ? 'mergeView' : single() ? 'docView' : 'listView';
+    ['docView', 'listView', 'mergeView'].forEach((x) => $(x).classList.toggle('on', x === v));
+    $('result').innerHTML = ''; $('msg').textContent = '';
+    $('go').disabled = o === 'merge' && !hasWord;
+  }
+  document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => !running && setOp(b.dataset.op)));
+
+  function convPanel() {
+    const t = $('cvTarget').value;
+    $('cvNote').textContent = t === 'pdf' ? (hasWord ? 'Il PDF viene creato da Microsoft Word: impaginazione identica a quella del documento.' : 'Word non è installato: il PDF viene creato dal contenuto e l’impaginazione può differire dall’originale.')
+      : t === 'md' ? 'Le immagini vengono salvate in una cartella accanto al file.' : t === 'images' ? 'Le immagini sono estratte nella loro qualità originale, in una cartella.' : '';
+  }
+  $('cvTarget').addEventListener('change', convPanel);
+
+  // ---------------- unisci ----------------
+  function renderMerge() {
+    const box = $('mlist'); box.innerHTML = '';
+    mlist.forEach((p, i) => {
+      const row = document.createElement('div'); row.className = 'mrow'; row.draggable = true;
+      row.innerHTML = '<span class="grip">⠿</span><span class="num"></span><span class="nm"></span><button class="up">▲</button><button class="dn">▼</button><button class="rm">✕</button>';
+      row.querySelector('.num').textContent = i + 1; row.querySelector('.nm').textContent = name(p);
+      row.querySelector('.up').onclick = () => { if (i > 0) { [mlist[i - 1], mlist[i]] = [mlist[i], mlist[i - 1]]; renderMerge(); } };
+      row.querySelector('.dn').onclick = () => { if (i < mlist.length - 1) { [mlist[i + 1], mlist[i]] = [mlist[i], mlist[i + 1]]; renderMerge(); } };
+      row.querySelector('.rm').onclick = () => { mlist.splice(i, 1); renderMerge(); };
+      row.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; });
+      row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('over'); });
+      row.addEventListener('dragleave', () => row.classList.remove('over'));
+      row.addEventListener('drop', (e) => { e.preventDefault(); const from = +e.dataTransfer.getData('text/plain'); if (!isNaN(from) && from !== i) { const [it] = mlist.splice(from, 1); mlist.splice(i, 0, it); } renderMerge(); });
+      box.append(row);
+    });
+    $('mSum').textContent = mlist.length ? `${mlist.length} documenti` : 'nessun documento';
+  }
+  $('mAdd').onclick = async () => { (await window.doc.add()).forEach((p) => mlist.push(p)); renderMerge(); };
+  $('mSort').onclick = () => { mlist.sort((a, b) => name(a).localeCompare(name(b), undefined, { numeric: true, sensitivity: 'base' })); renderMerge(); };
+  $('mClear').onclick = () => { mlist = []; renderMerge(); };
+
+  // ---------------- sostituisci ----------------
+  function addPair(f = '', r = '') {
+    const d = document.createElement('div'); d.className = 'pair';
+    d.innerHTML = '<input class="pf" placeholder="Trova"><input class="pr" placeholder="Sostituisci con"><button title="Rimuovi">✕</button>';
+    d.querySelector('.pf').value = f; d.querySelector('.pr').value = r;
+    d.querySelector('button').onclick = () => { if ($('pairs').children.length > 1) d.remove(); else { d.querySelector('.pf').value = ''; d.querySelector('.pr').value = ''; } };
+    $('pairs').append(d);
+  }
+  $('pAdd').onclick = () => { addPair(); $('pairs').lastChild.querySelector('.pf').focus(); };
+
+  // ---------------- esecuzione ----------------
+  function params() {
+    if (op === 'convert') return { target: $('cvTarget').value };
+    if (op === 'merge') { if (mlist.length < 2) throw new Error('Servono almeno due documenti da unire.'); return { files: mlist.slice(), pageBreak: $('mBreak').checked }; }
+    if (op === 'compress') return { level: document.querySelector('[name=clevel]:checked').value };
+    if (op === 'clean') {
+      const p = { comments: $('clComments').checked, changes: $('clChanges').checked, privacy: $('clPrivacy').checked };
+      if (!p.comments && !p.changes && !p.privacy) throw new Error('Scegli almeno una cosa da togliere.');
+      return p;
+    }
+    const pairs = [...document.querySelectorAll('.pair')].map((d) => ({ find: d.querySelector('.pf').value, replace: d.querySelector('.pr').value })).filter((x) => x.find);
+    if (!pairs.length) throw new Error('Scrivi almeno un testo da cercare.');
+    return { pairs, matchCase: $('rCase').checked };
+  }
+  window.doc.onProgress(({ index, total }) => { $('msg').textContent = total > 1 ? `Elaboro il documento ${index + 1} di ${total}…` : 'Elaboro…'; if (!single() && op !== 'merge') { const r = $('f' + index); if (r) r.querySelector('.st').textContent = '…'; } });
+  async function go() {
+    if (running) return;
+    let p; try { p = params(); } catch (e) { $('msg').textContent = cleanErr(e); return; }
+    $('result').innerHTML = ''; running = true; $('go').disabled = true; $('close').disabled = true; $('msg').textContent = 'Elaboro…';
+    let res; try { res = await window.doc.run(op, p); } catch (e) { res = [{ error: cleanErr(e) }]; }
+    running = false; $('go').disabled = op === 'merge' && !hasWord; $('close').disabled = false; $('msg').textContent = ''; showResults(res);
+  }
+  $('go').addEventListener('click', go); $('close').addEventListener('click', () => window.tool.close());
+  function showResults(res) {
+    const box = $('result'); box.innerHTML = '';
+    res.forEach((r, i) => {
+      const c = document.createElement('div'); c.className = 'card' + (r.error ? ' err' : '');
+      const label = !single() && r.file && op !== 'merge' ? name(r.file) + ': ' : '';
+      if (r.error) c.textContent = label + r.error;
+      else if (!r.outputs.length) { c.innerHTML = '<div class="note warn"></div>'; c.firstChild.textContent = label + (r.notes || []).join(' '); }
+      else {
+        const o = r.outputs, total = r.sizes.reduce((n, x) => n + x, 0);
+        c.innerHTML = '<div>✓ <b></b> <span class="note"></span></div><div class="row"></div>';
+        c.querySelector('b').textContent = o.length === 1 ? name(o[0]) : `${o.length} file creati`;
+        c.querySelector('.note').textContent = o.length === 1 ? fmtB(total) : `${fmtB(total)} in tutto`;
+        const row = c.querySelector('.row');
+        (r.notes || []).forEach((n) => { const d = document.createElement('div'); d.className = 'note' + (/non è disponibile|può differire/.test(n) ? ' warn' : ''); d.textContent = n; c.insertBefore(d, row); });
+        const b1 = document.createElement('button'); b1.textContent = 'Apri cartella'; b1.onclick = () => window.doc.reveal(o[0]); row.append(b1);
+        const b2 = document.createElement('button'); b2.textContent = 'Apri'; b2.onclick = () => window.doc.open(o[0]); row.append(b2);
+      }
+      box.append(c);
+      if (!single() && op !== 'merge') { const row = $('f' + i); if (row) { row.classList.add(r.error ? 'err' : 'ok'); row.querySelector('.st').textContent = r.error ? 'errore' : r.outputs.length ? 'fatto' : 'nessuna modifica'; if (r.error) row.querySelector('small').textContent = r.error; } }
+    });
+  }
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !running && document.activeElement.tagName !== 'INPUT') window.tool.close(); });
+
+  // ---------------- avvio ----------------
+  window.doc.init().then(async ({ files: f, preset, word }) => {
+    files = f; hasWord = word; mlist = f.slice();
+    $('info').textContent = f.length === 1 ? name(f[0]) : `${f.length} documenti`;
+    document.title = 'Documenti Word — ' + (f.length === 1 ? name(f[0]) : f.length + ' documenti');
+    if (!single()) { $('files').innerHTML = f.map((x, i) => `<div class="f" id="f${i}"><span></span><span class="st">in attesa</span><small></small></div>`).join(''); f.forEach((x, i) => { $('f' + i).querySelector('span').textContent = name(x); }); }
+    $('mWord').textContent = hasWord ? '' : 'Per unire i documenti serve Microsoft Word, che su questo computer non è installato.';
+    addPair();
+    const m = /^dx:(convert|merge|compress|clean|replace)(?::(\w+))?$/.exec(preset || '');
+    if (m && m[1] === 'convert' && m[2]) $('cvTarget').value = m[2];
+    convPanel(); renderMerge();
+    setOp(m ? m[1] : 'convert');
+    if (single()) await loadInfo();
+  });
+</script>

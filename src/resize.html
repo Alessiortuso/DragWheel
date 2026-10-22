@@ -1,0 +1,117 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; script-src 'self' file: 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: data: blob:; worker-src 'self' file: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Ridimensiona</title>
+<link rel="stylesheet" href="tool.css">
+<script src="tool-chrome.js"></script>
+<style>
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .card { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .card { transition: opacity .15s, border-color .15s; }
+  .card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .card:not(.active) { opacity: .5; } /* resta cliccabile: toccarla la riattiva */
+  .hint { opacity: .65; font-size: 13px; }
+  .sep { opacity: .6; }
+</style>
+<h1>Ridimensiona <small id="name"></small></h1>
+<div class="card" id="cardP">
+  <div class="row"><strong>In percentuale</strong><span class="hint" id="pHint"></span></div>
+  <div class="row">
+    <button data-p="25">25%</button><button data-p="50">50%</button><button data-p="75">75%</button><button data-p="150">150%</button><button data-p="200">200%</button>
+    <label>Altro <input type="number" id="pct" min="1" max="1000" placeholder="%"></label>
+  </div>
+</div>
+<div class="card" id="cardS">
+  <div class="row"><strong>In pixel</strong><span class="hint" id="sHint"></span></div>
+  <div class="row">
+    <label>Larghezza <input type="number" id="w" min="1"></label><span class="sep">×</span><label>Altezza <input type="number" id="h" min="1"></label><span class="sep">px</span>
+    <label><input type="checkbox" id="lock" checked> Mantieni proporzioni</label>
+  </div>
+  <div class="row hint" id="presets"></div>
+</div>
+<div class="sp"></div>
+<div class="bar"><span id="fp"></span></div>
+<div class="bar"><span id="status"></span><div class="sp"></div><button id="cancel">Annulla</button><button id="apply" class="primary">Ridimensiona</button></div>
+<script src="format-picker.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const fp = FormatPicker.mount($('fp'), { withSame: true });
+  let W = 0, H = 0, single = true, mode = 'percent', pct = 50;
+
+  // Percentuale e pixel restano allineati (per una sola immagine): ciò che vedi nei campi è ciò che verrà usato.
+  // Conta l'ultima modificata; la scheda non attiva è attenuata.
+  const round1 = (v) => Math.round(v * 10) / 10;
+  function setMode(m) { mode = m; $('cardP').classList.toggle('active', m === 'percent'); $('cardS').classList.toggle('active', m === 'size'); }
+  function markChips() { document.querySelectorAll('[data-p]').forEach((b) => b.classList.toggle('on', +b.dataset.p === pct)); }
+  function hints() {
+    if (!single) { $('pHint').textContent = ''; return; }
+    $('pHint').textContent = pct > 0
+      ? (mode === 'percent' ? `→ ${Math.max(1, Math.round(W * pct / 100))} × ${Math.max(1, Math.round(H * pct / 100))} px` : `≈ ${pct}% dell'originale`)
+      : '';
+  }
+  function pixelsFromPercent() {
+    if (single && pct > 0) { $('w').value = Math.max(1, Math.round(W * pct / 100)); $('h').value = Math.max(1, Math.round(H * pct / 100)); }
+  }
+  function percentFromPixels() { // solo con proporzioni bloccate: altrimenti la percentuale non è definita
+    pct = single && $('lock').checked && +$('w').value ? round1((+$('w').value / W) * 100) : 0;
+    $('pct').value = pct || '';
+  }
+  function setPercent(v) { pct = v; $('pct').value = v || ''; setMode('percent'); pixelsFromPercent(); markChips(); hints(); }
+  document.querySelectorAll('[data-p]').forEach((b) => b.addEventListener('click', () => setPercent(+b.dataset.p)));
+  $('pct').addEventListener('input', () => { pct = +$('pct').value; setMode('percent'); pixelsFromPercent(); markChips(); hints(); });
+  $('cardP').addEventListener('pointerdown', () => { if (mode !== 'percent' && pct > 0) { setMode('percent'); pixelsFromPercent(); hints(); } });
+  $('cardS').addEventListener('pointerdown', () => { if (mode !== 'size') { setMode('size'); hints(); } });
+
+  // Con più immagini W×H è un riquadro massimo, quindi le proporzioni restano sempre bloccate
+  function sync(changed) {
+    setMode('size');
+    if (single && $('lock').checked) {
+      if (changed === 'w' && $('w').value) $('h').value = Math.max(1, Math.round($('w').value * H / W));
+      if (changed === 'h' && $('h').value) $('w').value = Math.max(1, Math.round($('h').value * W / H));
+    }
+    percentFromPixels(); markChips(); hints();
+  }
+  $('w').addEventListener('input', () => sync('w'));
+  $('h').addEventListener('input', () => sync('h'));
+  $('lock').addEventListener('change', () => sync($('w').value ? 'w' : 'h'));
+
+  $('cancel').addEventListener('click', () => window.tool.close());
+  async function apply() {
+    const status = $('status');
+    const params = mode === 'percent' ? { percent: pct } : { width: +$('w').value || 0, height: +$('h').value || 0, lock: $('lock').checked || !single };
+    params.output = fp.get();
+    if (mode === 'percent' && !(pct > 0)) { status.className = 'err'; status.textContent = 'Indica una percentuale'; return; }
+    $('apply').disabled = true; status.className = ''; status.textContent = 'Elaborazione…';
+    try {
+      const res = await window.tool.apply(params);
+      status.textContent = `✓ ${res.outputs.length} ${res.outputs.length === 1 ? 'file salvato' : 'file salvati'}`;
+      setTimeout(() => window.tool.close(), 1300);
+    } catch (e) { status.className = 'err'; status.textContent = String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); $('apply').disabled = false; }
+  }
+  $('apply').addEventListener('click', apply);
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') window.tool.close(); else if (e.key === 'Enter') apply(); });
+
+  window.tool.init().then(({ files, info, output }) => {
+    fp.set(output);
+    single = files.length === 1;
+    setMode('percent');
+    $('pct').value = pct;
+    if (single) {
+      W = info.width; H = info.height;
+      $('name').textContent = `${files[0].split(/[\\/]/).pop()} — ${W} × ${H} px`;
+      pixelsFromPercent(); markChips(); hints();
+      $('presets').innerHTML = '';
+      for (const w of [3840, 1920, 1280, 800, 400].filter((v) => v < W)) {
+        const b = document.createElement('button');
+        b.textContent = `${w} px`; b.addEventListener('click', () => { $('lock').checked = true; $('w').value = w; sync('w'); });
+        $('presets').append(b);
+      }
+    } else {
+      markChips();
+      $('name').textContent = `${files.length} immagini`;
+      $('lock').checked = true; $('lock').disabled = true;
+      $('sHint').textContent = 'ogni immagine entra in questo riquadro mantenendo le proporzioni';
+      $('pct').placeholder = '%';
+    }
+  });
+</script>

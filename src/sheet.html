@@ -1,0 +1,337 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; script-src 'self' file: 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: data: blob:; worker-src 'self' file: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Fogli di calcolo</title>
+<link rel="stylesheet" href="tool.css">
+<script src="tool-chrome.js"></script>
+<style>
+  body { padding: 0; gap: 0; overflow: hidden; }
+  header { padding: 10px 16px 0; display: flex; align-items: baseline; gap: 12px; }
+  header strong { font-size: 15px; }
+  #info { font-size: 12.5px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  nav { display: flex; gap: 4px; padding: 10px 16px 0; border-bottom: 1px solid var(--line); }
+  nav button { border: 0; border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0; padding: 8px 14px; background: transparent; }
+  nav button.on { background: transparent; color: inherit; border-bottom-color: var(--accent); font-weight: 700; }
+  nav button:disabled { opacity: .35; }
+  main { flex: 1; min-height: 0; display: flex; }
+  #left { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 14px 16px; gap: 10px; }
+  #right { width: 360px; border-left: 1px solid var(--line); padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .view { display: none; flex: 1; min-height: 0; flex-direction: column; gap: 10px; }
+  .view.on { display: flex; }
+  #tabsRow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  #tabsRow button { padding: 4px 12px; } #tabsRow button.hidden { opacity: .5; font-style: italic; }
+  #gridBox { flex: 1; min-height: 0; overflow: auto; background: rgba(255, 255, 255, .55); border: 1px solid var(--line); border-radius: 10px; }
+  table.g { border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  table.g th, table.g td { border: 1px solid rgba(90, 45, 15, .14); padding: 3px 8px; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+  table.g thead th, table.g .rn { background: rgba(255, 236, 214, .9); font-weight: 600; position: sticky; color: #6b4a33; }
+  table.g thead th { top: 0; } table.g .rn { left: 0; text-align: right; }
+  table.g td.h { font-weight: 700; background: rgba(232, 80, 47, .10); }
+  table.g td.n { text-align: right; }
+  #files, #mlist { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .f, .mrow { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+  .f { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; } .f small, .mrow small { opacity: .65; } .f .st { text-align: right; opacity: .8; }
+  .f.err { border-color: #c0260d; } .f.ok .st::before { content: '✓ '; color: #2a9a3a; }
+  .mrow { display: flex; align-items: center; gap: 10px; cursor: grab; } .mrow.over { outline: 2px dashed var(--accent); }
+  .mrow .grip { opacity: .45; font-size: 16px; } .mrow .num { width: 22px; text-align: right; opacity: .6; }
+  .mrow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; } .mrow button { padding: 2px 8px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .slot { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .slot b.l { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .6; } .slot .nm { font-size: 15px; font-weight: 700; word-break: break-all; }
+  section.pane { display: none; flex-direction: column; gap: 12px; } section.pane.on { display: flex; }
+  h2 { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; opacity: .6; margin: 0; font-weight: 700; }
+  .fld { display: flex; flex-direction: column; align-items: stretch; gap: 5px; font-size: 13px; } .fld select { width: 100%; }
+  label.row { display: flex; gap: 8px; align-items: flex-start; flex-wrap: nowrap; } .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .note { font-size: 12.5px; opacity: .7; line-height: 1.45; } .note.warn { color: #b8620a; opacity: 1; }
+  .radio { display: flex; flex-direction: column; gap: 8px; }
+  .card { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .card.err { border-color: #c0260d; color: #b0200a; }
+  .dim { opacity: .45; }
+  footer { border-top: 1px solid var(--line); padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+  #msg { font-size: 13px; opacity: .85; }
+</style>
+
+<header><strong>Fogli di calcolo</strong><span id="info"></span></header>
+<nav id="tabs"><button data-op="convert">Converti</button><button data-op="split">Dividi</button><button data-op="merge">Unisci</button><button data-op="clean">Pulisci</button><button data-op="diff">Confronta</button></nav>
+
+<main>
+  <div id="left">
+    <div class="view" id="gridView">
+      <div id="tabsRow"></div>
+      <div id="gridBox"></div>
+      <div class="note" id="gridNote"></div>
+    </div>
+    <div class="view" id="listView"><div id="files"></div></div>
+    <div class="view" id="mergeView">
+      <div class="toolbar"><button id="mAdd">Aggiungi file…</button><button id="mSort">Ordina per nome</button><button id="mClear">Svuota</button><div class="sp"></div><span class="note" id="mSum"></span></div>
+      <div id="mlist"></div>
+      <div class="note">Trascina le righe per cambiare l’ordine: il risultato segue questa sequenza, dall’alto in basso.</div>
+    </div>
+    <div class="view" id="diffView">
+      <div class="slot"><b class="l">File A (originale)</b><span class="nm" id="dA">—</span><small class="note" id="dAi"></small><div class="row"><button id="pickA">Scegli…</button></div></div>
+      <div class="row" style="justify-content:center"><button id="swap">⇅ Scambia A e B</button></div>
+      <div class="slot"><b class="l">File B (modificato)</b><span class="nm" id="dB">—</span><small class="note" id="dBi"></small><div class="row"><button id="pickB">Scegli…</button></div></div>
+    </div>
+  </div>
+
+  <div id="right">
+    <!-- CONVERTI -->
+    <section class="pane" data-op="convert">
+      <label class="fld"><span>Converti in</span><select id="cvTarget"></select></label>
+      <div id="csvOpts" style="display:contents">
+        <label class="fld"><span>Separatore</span><select id="cvDelim"><option value=";">Punto e virgola ( ; ) — Excel italiano</option><option value=",">Virgola ( , )</option><option value="&#9;">Tabulazione</option></select></label>
+        <label class="row"><input type="checkbox" id="cvComma" checked><span>Numeri con la virgola (1,5 invece di 1.5)</span></label>
+        <label class="row"><input type="checkbox" id="cvBom" checked><span>Compatibile con Excel (accenti e lettere speciali)</span></label>
+      </div>
+      <label class="row" id="jsonOne"><input type="checkbox" id="cvOne" checked><span>Un unico file con tutti i fogli</span></label>
+      <div class="note" id="cvNote"></div>
+    </section>
+
+    <!-- DIVIDI -->
+    <section class="pane" data-op="split">
+      <div class="radio">
+        <label class="row"><input type="radio" name="smode" value="sheet" checked><span><b>Un file per ogni foglio</b></span></label>
+        <label class="row"><input type="radio" name="smode" value="column"><span><b>Un file per ogni valore di una colonna</b><br><span class="note">Per esempio un file per cliente, regione o mese.</span></span></label>
+      </div>
+      <div id="spCols" style="display:contents">
+        <label class="fld"><span>Foglio</span><select id="spSheet"></select></label>
+        <label class="fld"><span>Colonna</span><select id="spCol"></select></label>
+      </div>
+      <div class="note" id="spNote"></div>
+    </section>
+
+    <!-- UNISCI -->
+    <section class="pane" data-op="merge">
+      <div class="radio">
+        <label class="row"><input type="radio" name="mmode" value="stack" checked><span><b>Righe una sotto l’altra</b><br><span class="note">Per file con le stesse colonne (per esempio i report di ogni mese). Le colonne si abbinano per nome.</span></span></label>
+        <label class="row"><input type="radio" name="mmode" value="sheets"><span><b>Un foglio per ogni file</b><br><span class="note">Tutto in un unico file, ogni foglio al suo posto.</span></span></label>
+      </div>
+      <label class="row" id="mSrcWrap"><input type="checkbox" id="mSrc" checked><span>Aggiungi una colonna con il nome del file di origine</span></label>
+      <div class="note">Se i file sono tutti CSV, anche il risultato è un CSV.</div>
+    </section>
+
+    <!-- PULISCI -->
+    <section class="pane" data-op="clean">
+      <h2>Ripulisci</h2>
+      <label class="row"><input type="checkbox" id="clRows" checked><span>Elimina le <b>righe vuote</b></span></label>
+      <label class="row"><input type="checkbox" id="clTrim" checked><span>Togli gli <b>spazi inutili</b> a inizio, fine e doppi</span></label>
+      <label class="row"><input type="checkbox" id="clText" checked><span>Converti in numeri e date quelli <b>salvati come testo</b></span></label>
+      <label class="row"><input type="checkbox" id="clDup"><span>Elimina le <b>righe duplicate</b> (tiene la prima)</span></label>
+      <label class="row"><input type="checkbox" id="clCols"><span>Elimina le <b>colonne vuote</b></span></label>
+      <h2>Prima di inviare il file</h2>
+      <label class="row"><input type="checkbox" id="clFormulas"><span>Sostituisci le <b>formule con i valori</b></span></label>
+      <label class="row"><input type="checkbox" id="clHidden"><span>Elimina i <b>fogli nascosti</b></span></label>
+      <label class="row"><input type="checkbox" id="clPrivacy"><span>Togli <b>autore, società e commenti</b></span></label>
+      <div class="note">Colori, grassetti e formati restano. Il file originale non viene toccato: il risultato è “… (pulito)”.</div>
+    </section>
+
+    <!-- CONFRONTA -->
+    <section class="pane" data-op="diff">
+      <div class="radio">
+        <label class="row"><input type="radio" name="dmode" value="cell" checked><span><b>Cella per cella</b><br><span class="note">Confronta ogni cella con quella nella stessa posizione.</span></span></label>
+        <label class="row"><input type="radio" name="dmode" value="key"><span><b>Abbinando le righe per una colonna</b><br><span class="note">Utile se le righe sono state spostate o aggiunte (per esempio un codice o un ID).</span></span></label>
+      </div>
+      <label class="fld" id="dKeyWrap"><span>Colonna chiave</span><select id="dKey"></select></label>
+      <div class="note">Il risultato è un nuovo file con un riepilogo e l’elenco di tutte le differenze.</div>
+    </section>
+
+    <div id="result"></div>
+  </div>
+</main>
+
+<footer>
+  <div id="msg"></div><div class="sp"></div>
+  <button id="close">Chiudi</button><button id="go" class="primary">Converti</button>
+</footer>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const name = (p) => String(p).split(/[\\/]/).pop();
+  const extOf = (p) => (name(p).split('.').pop() || '').toLowerCase();
+  const KIND = { xlsx: 'xlsx', xlsm: 'xlsx', xls: 'xls', ods: 'ods', csv: 'csv', tsv: 'csv', txt: 'csv' };
+  const fmtB = (b) => (b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB').replace('.', ',');
+  const colLetter = (n) => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = ((n - 1 - m) / 26) | 0; } return s; };
+  const cleanErr = (e) => String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  const escH = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  let files = [], op = 'convert', running = false, info = null, curSheet = 0, mlist = [], dA = null, dB = null, infoA = null, infoB = null;
+  const single = () => files.length === 1;
+
+  // ---------------- anteprima ----------------
+  function renderGrid() {
+    const box = $('gridBox'), tabs = $('tabsRow');
+    if (!info) { box.innerHTML = ''; return; }
+    if (info.error) { box.innerHTML = `<div class="note warn" style="padding:16px">${escH(info.error)}</div>`; return; }
+    tabs.innerHTML = '';
+    info.sheets.forEach((s, i) => { const b = document.createElement('button'); b.textContent = s.name + (s.hidden ? ' (nascosto)' : ''); b.className = (i === curSheet ? 'on ' : '') + (s.hidden ? 'hidden' : ''); b.onclick = () => { curSheet = i; renderGrid(); }; tabs.append(b); });
+    const sh = info.sheets[curSheet], rows = sh.preview;
+    const hr = rows.findIndex((r) => r.some((v) => v !== '' && v !== null)), cols = rows.reduce((n, r) => Math.max(n, r.length), 0);
+    let h = '<table class="g"><thead><tr><th></th>' + Array.from({ length: cols }, (_, c) => `<th>${colLetter(c + 1)}</th>`).join('') + '</tr></thead><tbody>';
+    rows.forEach((r, i) => { h += `<tr><td class="rn">${i + 1}</td>` + Array.from({ length: cols }, (_, c) => { const v = r[c]; return `<td class="${i === hr ? 'h' : ''}${typeof v === 'number' ? ' n' : ''}">${v === '' || v === null || v === undefined ? '' : escH(v)}</td>`; }).join('') + '</tr>'; });
+    box.innerHTML = h + '</tbody></table>';
+    $('gridNote').textContent = `${sh.rows} righe × ${sh.cols} colonne${sh.rows > rows.length || sh.cols > cols ? ` — mostrate le prime ${rows.length} righe e ${cols} colonne` : ''}`;
+    fillSplitSelects();
+  }
+  async function loadInfo() {
+    info = null; $('gridBox').innerHTML = '<div class="note" style="padding:16px">Leggo il file…</div>';
+    info = await window.sheet.inspect(files[0]);
+    curSheet = Math.max(0, info.sheets ? info.sheets.findIndex((s) => !s.hidden) : 0);
+    renderGrid(); convPanel(); splitPanel();
+  }
+
+  // ---------------- schede ----------------
+  const GO = { convert: 'Converti', split: 'Dividi', merge: 'Unisci', clean: 'Pulisci', diff: 'Confronta' };
+  function setOp(o) {
+    op = o;
+    document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.op === o));
+    document.querySelectorAll('section.pane').forEach((s) => s.classList.toggle('on', s.dataset.op === o));
+    $('go').textContent = GO[o];
+    const v = o === 'merge' ? 'mergeView' : o === 'diff' ? 'diffView' : single() ? 'gridView' : 'listView';
+    ['gridView', 'listView', 'mergeView', 'diffView'].forEach((x) => $(x).classList.toggle('on', x === v));
+    $('result').innerHTML = ''; $('msg').textContent = '';
+  }
+  document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => !running && setOp(b.dataset.op)));
+
+  // ---------------- converti ----------------
+  function convPanel() {
+    const ext = extOf(files[0]), kind = KIND[ext], own = ext === 'xlsm' ? 'xlsm' : kind === 'csv' ? (ext === 'tsv' ? 'tsv' : 'csv') : kind, sel = $('cvTarget'), keep = sel.value;
+    sel.innerHTML = [['xlsx', 'XLSX (Excel)'], ['xls', 'XLS (Excel 97-2003)'], ['ods', 'ODS (LibreOffice)'], ['csv', 'CSV (testo con separatori)'], ['tsv', 'TSV (testo con tabulazioni)'], ['json', 'JSON'], ['html', 'HTML (pagina web)'], ['pdf', 'PDF']].filter(([k]) => k !== own).map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
+    if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+    const t = sel.value, many = info && info.sheets && info.sheets.filter((s) => !s.hidden).length > 1;
+    $('csvOpts').style.display = t === 'csv' ? 'contents' : 'none';
+    $('jsonOne').style.display = t === 'json' && (many || !single()) ? '' : 'none';
+    const nv = info && info.sheets ? info.sheets.filter((s) => !s.hidden).length : 1;
+    $('cvNote').textContent = (t === 'csv' || t === 'tsv') && nv > 1 ? `Il file ha ${nv} fogli: ognuno diventa un file ${t.toUpperCase()}.` : t === 'xls' || t === 'ods' || kind === 'xls' ? 'I formati XLS e ODS non conservano tutti gli stili: colori e formattazione possono essere semplificati.' : t === 'pdf' ? 'Il PDF contiene le celle in forma di tabella (una per foglio): colori e larghezze delle colonne non sono riprodotti.' : '';
+  }
+  $('cvTarget').addEventListener('change', convPanel);
+  $('cvDelim').addEventListener('change', () => { $('cvComma').checked = $('cvDelim').value === ';'; });
+
+  // ---------------- dividi ----------------
+  function fillSplitSelects() {
+    if (!info || !info.sheets) return;
+    const vis = info.sheets.filter((s) => !s.hidden);
+    $('spSheet').innerHTML = vis.map((s) => `<option>${escH(s.name)}</option>`).join('');
+    $('spSheet').value = info.sheets[curSheet] && !info.sheets[curSheet].hidden ? info.sheets[curSheet].name : vis[0]?.name;
+    fillSplitCols();
+  }
+  function fillSplitCols() {
+    const sh = info && info.sheets && info.sheets.find((s) => s.name === $('spSheet').value);
+    if (!sh) { $('spCol').innerHTML = ''; return; }
+    const rows = sh.preview, hr = Math.max(0, rows.findIndex((r) => r.some((v) => v !== '' && v !== null)));
+    $('spCol').innerHTML = (rows[hr] || []).map((v, i) => (v === '' || v === null ? '' : `<option value="${escH(v)}">${escH(v)}  (${colLetter(i + 1)})</option>`)).join('');
+  }
+  $('spSheet').addEventListener('change', fillSplitCols);
+  function splitPanel() {
+    const vis = info && info.sheets ? info.sheets.filter((s) => !s.hidden).length : 1, multi = !single();
+    const bySheet = document.querySelector('[name=smode][value=sheet]'), byCol = document.querySelector('[name=smode][value=column]');
+    bySheet.disabled = !multi && vis < 2 ? true : false; byCol.disabled = multi;
+    if (bySheet.disabled && bySheet.checked) byCol.checked = true;
+    if (byCol.disabled && byCol.checked) bySheet.checked = true;
+    $('spCols').style.display = byCol.checked ? 'contents' : 'none';
+    $('spNote').textContent = multi ? 'Con più file la divisione per colonna non è disponibile: apri un file alla volta.' : bySheet.disabled ? 'Questo file ha un solo foglio: puoi dividerlo per i valori di una colonna.' : '';
+  }
+  document.querySelectorAll('[name=smode]').forEach((r) => r.addEventListener('change', splitPanel));
+
+  // ---------------- unisci ----------------
+  function renderMerge() {
+    const box = $('mlist'); box.innerHTML = '';
+    mlist.forEach((p, i) => {
+      const row = document.createElement('div'); row.className = 'mrow'; row.draggable = true;
+      row.innerHTML = '<span class="grip">⠿</span><span class="num"></span><span class="nm"></span><button class="up">▲</button><button class="dn">▼</button><button class="rm">✕</button>';
+      row.querySelector('.num').textContent = i + 1; row.querySelector('.nm').textContent = name(p);
+      row.querySelector('.up').onclick = () => { if (i > 0) { [mlist[i - 1], mlist[i]] = [mlist[i], mlist[i - 1]]; renderMerge(); } };
+      row.querySelector('.dn').onclick = () => { if (i < mlist.length - 1) { [mlist[i + 1], mlist[i]] = [mlist[i], mlist[i + 1]]; renderMerge(); } };
+      row.querySelector('.rm').onclick = () => { mlist.splice(i, 1); renderMerge(); };
+      row.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; });
+      row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('over'); });
+      row.addEventListener('dragleave', () => row.classList.remove('over'));
+      row.addEventListener('drop', (e) => { e.preventDefault(); const from = +e.dataTransfer.getData('text/plain'); if (!isNaN(from) && from !== i) { const [it] = mlist.splice(from, 1); mlist.splice(i, 0, it); } renderMerge(); });
+      box.append(row);
+    });
+    $('mSum').textContent = mlist.length ? `${mlist.length} file` : 'nessun file';
+  }
+  $('mAdd').onclick = async () => { (await window.sheet.add()).forEach((p) => mlist.push(p)); renderMerge(); };
+  $('mSort').onclick = () => { mlist.sort((a, b) => name(a).localeCompare(name(b), undefined, { numeric: true, sensitivity: 'base' })); renderMerge(); };
+  $('mClear').onclick = () => { mlist = []; renderMerge(); };
+  document.querySelectorAll('[name=mmode]').forEach((r) => r.addEventListener('change', () => { $('mSrcWrap').classList.toggle('dim', r.value === 'sheets' && r.checked); }));
+
+  // ---------------- confronta ----------------
+  async function describe(which) {
+    const p = which === 'A' ? dA : dB; $('d' + which).textContent = p ? name(p) : '—'; $('d' + which + 'i').textContent = '';
+    if (!p) return;
+    $('d' + which + 'i').textContent = 'Leggo il file…';
+    const i = await window.sheet.inspect(p);
+    if (which === 'A') infoA = i; else infoB = i;
+    $('d' + which + 'i').textContent = i.error ? i.error : i.sheets.filter((s) => !s.hidden).map((s) => `${s.name} (${s.rows}×${s.cols})`).join(' · ');
+    fillKeys();
+  }
+  function fillKeys() {
+    const heads = (i) => { const sh = i && i.sheets && i.sheets.find((s) => !s.hidden); if (!sh) return []; const hr = Math.max(0, sh.preview.findIndex((r) => r.some((v) => v !== '' && v !== null))); return (sh.preview[hr] || []).filter((v) => v !== '' && v !== null).map(String); };
+    const a = heads(infoA), b = heads(infoB).map((x) => x.toLowerCase()), common = a.filter((x) => b.includes(x.toLowerCase()));
+    $('dKey').innerHTML = common.map((h) => `<option>${escH(h)}</option>`).join('');
+    $('dKeyWrap').classList.toggle('dim', !common.length);
+  }
+  async function pick(which) { const r = await window.sheet.add(); if (!r.length) return; if (which === 'A') dA = r[0]; else dB = r[0]; describe(which); }
+  $('pickA').onclick = () => pick('A'); $('pickB').onclick = () => pick('B');
+  $('swap').onclick = () => { [dA, dB] = [dB, dA]; [infoA, infoB] = [infoB, infoA]; describe('A'); describe('B'); };
+  document.querySelectorAll('[name=dmode]').forEach((r) => r.addEventListener('change', () => { $('dKeyWrap').style.display = document.querySelector('[name=dmode]:checked').value === 'key' ? '' : 'none'; }));
+
+  // ---------------- esecuzione ----------------
+  function params() {
+    if (op === 'convert') return { target: $('cvTarget').value, delimiter: $('cvDelim').value, decimalComma: $('cvComma').checked, bom: $('cvBom').checked, oneFile: $('cvOne').checked };
+    if (op === 'split') { const m = document.querySelector('[name=smode]:checked').value; return m === 'sheet' ? { mode: 'sheet' } : { mode: 'column', sheet: $('spSheet').value, column: $('spCol').value }; }
+    if (op === 'merge') { if (!mlist.length) throw new Error('Aggiungi almeno un file.'); return { files: mlist.slice(), mode: document.querySelector('[name=mmode]:checked').value, addSource: $('mSrc').checked }; }
+    if (op === 'clean') return { emptyRows: $('clRows').checked, trim: $('clTrim').checked, textNumbers: $('clText').checked, dedupe: $('clDup').checked, emptyCols: $('clCols').checked, formulas: $('clFormulas').checked, hiddenSheets: $('clHidden').checked, personalInfo: $('clPrivacy').checked };
+    if (!dA || !dB) throw new Error('Scegli i due file da confrontare.');
+    const key = document.querySelector('[name=dmode]:checked').value === 'key';
+    if (key && !$('dKey').value) throw new Error('Non ci sono colonne con lo stesso nome nei due file: confronta cella per cella.');
+    return { fileA: dA, fileB: dB, key: key ? $('dKey').value : '' };
+  }
+  window.sheet.onProgress(({ index, total }) => { $('msg').textContent = total > 1 ? `Elaboro il file ${index + 1} di ${total}…` : 'Elaboro…'; if (!single() && op !== 'merge' && op !== 'diff') { const r = $('f' + index); if (r) r.querySelector('.st').textContent = '…'; } });
+  async function go() {
+    if (running) return;
+    let p; try { p = params(); } catch (e) { $('msg').textContent = cleanErr(e); return; }
+    $('result').innerHTML = ''; running = true; $('go').disabled = true; $('close').disabled = true; $('msg').textContent = 'Elaboro…';
+    let res; try { res = await window.sheet.run(op, p); } catch (e) { res = [{ error: cleanErr(e) }]; }
+    running = false; $('go').disabled = false; $('close').disabled = false; $('msg').textContent = ''; showResults(res);
+  }
+  $('go').addEventListener('click', go); $('close').addEventListener('click', () => window.tool.close());
+  function showResults(res) {
+    const box = $('result'); box.innerHTML = '';
+    res.forEach((r, i) => {
+      const c = document.createElement('div'); c.className = 'card' + (r.error ? ' err' : '');
+      if (r.error) c.textContent = (!single() && r.file && op !== 'merge' && op !== 'diff' ? name(r.file) + ': ' : '') + r.error;
+      else {
+        const o = r.outputs, total = r.sizes.reduce((n, x) => n + x, 0);
+        c.innerHTML = '<div>✓ <b></b> <span class="note"></span></div><div class="row"></div>';
+        c.querySelector('b').textContent = o.length === 1 ? name(o[0]) : `${o.length} file creati`;
+        c.querySelector('.note').textContent = o.length === 1 ? fmtB(total) : `${fmtB(total)} in tutto`;
+        const row = c.querySelector('.row'); // righe di testo sopra i pulsanti
+        if (o.length > 1) { const l = document.createElement('div'); l.className = 'note'; l.textContent = o.slice(0, 5).map(name).join(' · ') + (o.length > 5 ? ' · …' : ''); c.insertBefore(l, row); }
+        (r.notes || []).forEach((n) => { const d = document.createElement('div'); d.className = 'note' + (/non coincidono|non sono state toccate|diventate valori/.test(n) ? ' warn' : ''); d.textContent = n; c.insertBefore(d, row); });
+        const b1 = document.createElement('button'); b1.textContent = 'Apri cartella'; b1.onclick = () => window.sheet.reveal(o[0]); row.append(b1);
+        const b2 = document.createElement('button'); b2.textContent = o.length === 1 ? 'Apri' : 'Apri il primo'; b2.onclick = () => window.sheet.open(o[0]); row.append(b2);
+      }
+      box.append(c);
+      if (!single() && op !== 'merge' && op !== 'diff') { const row = $('f' + i); if (row) { row.classList.add(r.error ? 'err' : 'ok'); row.querySelector('.st').textContent = r.error ? 'errore' : 'fatto'; if (r.error) row.querySelector('small').textContent = r.error; } }
+    });
+  }
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !running) window.tool.close(); });
+
+  // ---------------- avvio ----------------
+  window.sheet.init().then(async ({ files: f, preset }) => {
+    files = f; mlist = f.slice();
+    $('info').textContent = f.length === 1 ? name(f[0]) : `${f.length} file`;
+    document.title = 'Fogli di calcolo — ' + (f.length === 1 ? name(f[0]) : f.length + ' file');
+    if (f.length === 2) { dA = f[0]; dB = f[1]; }
+    if (!single()) $('files').innerHTML = f.map((x, i) => `<div class="f" id="f${i}"><span></span><span class="st">in attesa</span><small></small></div>`).join('');
+    if (!single()) f.forEach((x, i) => { $('f' + i).querySelector('span').textContent = name(x); });
+    const m = /^xl:(convert|split|merge|clean|diff)(?::(\w+))?$/.exec(preset || '');
+    convPanel(); splitPanel(); renderMerge();
+    if (m && m[1] === 'convert' && m[2]) { convPanel(); $('cvTarget').value = m[2]; convPanel(); }
+    $('dKeyWrap').style.display = 'none';
+    setOp(m ? m[1] : 'convert');
+    if (f.length === 2) { describe('A'); describe('B'); }
+    await loadInfo();
+    if (m && m[1] === 'convert' && m[2]) { $('cvTarget').value = m[2]; convPanel(); }
+  });
+</script>

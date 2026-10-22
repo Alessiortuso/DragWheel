@@ -1,0 +1,152 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; script-src 'self' file: 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: data: blob:; worker-src 'self' file: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Ritaglia immagine</title>
+<link rel="stylesheet" href="tool.css">
+<script src="tool-chrome.js"></script>
+<style>
+  #wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #stage { position: relative; touch-action: none; box-shadow: 0 2px 14px rgba(0,0,0,.35); }
+  #img { display: block; width: 100%; height: 100%; pointer-events: none; }
+  /* La maschera che scurisce l'esterno del ritaglio sta in un contenitore che taglia al bordo dell'immagine */
+  #shade { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  #shadeBox { position: absolute; box-shadow: 0 0 0 9999px rgba(0,0,0,.55); }
+  #box { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.5) inset; cursor: move; }
+  #box::before, #box::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(#fff6 1px, transparent 1px) 0 33.33%/100% 33.33% repeat-y, linear-gradient(90deg, #fff6 1px, transparent 1px) 33.33% 0/33.33% 100% repeat-x; }
+  .h { position: absolute; width: 14px; height: 14px; background: #fff; border: 2px solid var(--accent); border-radius: 50%; margin: -7px 0 0 -7px; }
+  .h.nw { left: 0; top: 0; cursor: nwse-resize; } .h.n { left: 50%; top: 0; cursor: ns-resize; } .h.ne { left: 100%; top: 0; cursor: nesw-resize; }
+  .h.w { left: 0; top: 50%; cursor: ew-resize; } .h.e { left: 100%; top: 50%; cursor: ew-resize; }
+  .h.sw { left: 0; top: 100%; cursor: nesw-resize; } .h.s { left: 50%; top: 100%; cursor: ns-resize; } .h.se { left: 100%; top: 100%; cursor: nwse-resize; }
+</style>
+<h1 id="title">Ritaglia <small id="name"></small></h1>
+<div id="wrap"><div id="stage"><img id="img" alt=""><div id="shade"><div id="shadeBox"></div></div><div id="box">
+  <i class="h nw" data-h="nw"></i><i class="h n" data-h="n"></i><i class="h ne" data-h="ne"></i><i class="h w" data-h="w"></i>
+  <i class="h e" data-h="e"></i><i class="h sw" data-h="sw"></i><i class="h s" data-h="s"></i><i class="h se" data-h="se"></i>
+</div></div></div>
+<div class="bar" id="ratios">
+  <span style="opacity:.7">Proporzioni</span>
+  <button data-r="free" class="on">Libero</button><button data-r="1:1">1:1</button><button data-r="16:9">16:9</button>
+  <button data-r="9:16">9:16</button><button data-r="4:3">4:3</button><button data-r="3:4">3:4</button>
+</div>
+<div class="bar">
+  <label>L <input type="number" id="w" min="1"></label><label>A <input type="number" id="h" min="1"></label><span style="opacity:.7">px</span>
+  <span id="fp" style="margin-left:14px"></span>
+  <div class="sp"></div><span id="status"></span>
+  <button id="reset">Ripristina</button><button id="cancel">Annulla</button><button id="apply" class="primary">Ritaglia</button>
+</div>
+<script src="format-picker.js"></script>
+<script>
+  const MIN = 8;
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage'), box = $('box'), wIn = $('w'), hIn = $('h'), status = $('status');
+  let W = 0, H = 0, k = 1, rect = null, ratio = null;
+
+  const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+  function draw() {
+    const g = { left: rect.x * k + 'px', top: rect.y * k + 'px', width: rect.w * k + 'px', height: rect.h * k + 'px' };
+    Object.assign(box.style, g); Object.assign($('shadeBox').style, g);
+    if (document.activeElement !== wIn) wIn.value = Math.round(rect.w);
+    if (document.activeElement !== hIn) hIn.value = Math.round(rect.h);
+  }
+
+  // Rettangolo di dimensioni (w,h) con un punto fisso (px,py) e ancoraggio (ax,ay) in {0, .5, 1}; se esce dall'immagine si rimpicciolisce
+  function anchored(px, py, ax, ay, w, h) {
+    const maxW = ax === 0 ? W - px : ax === 1 ? px : 2 * Math.min(px, W - px);
+    const maxH = ay === 0 ? H - py : ay === 1 ? py : 2 * Math.min(py, H - py);
+    const s = Math.min(1, maxW / w, maxH / h);
+    w *= s; h *= s;
+    return { x: px - ax * w, y: py - ay * h, w, h };
+  }
+
+  function resizeBy(handle, o, px, py) {
+    px = clamp(px, 0, W); py = clamp(py, 0, H);
+    const L = handle.includes('w'), R = handle.includes('e'), T = handle.includes('n'), B = handle.includes('s');
+    let l = o.x, r = o.x + o.w, t = o.y, b = o.y + o.h;
+    if (L) l = Math.min(px, r - MIN); if (R) r = Math.max(px, l + MIN);
+    if (T) t = Math.min(py, b - MIN); if (B) b = Math.max(py, t + MIN);
+    let w = r - l, h = b - t;
+    if (!ratio) return { x: l, y: t, w, h };
+    if ((L || R) && (T || B)) { w = Math.max(w, h * ratio); h = w / ratio; }
+    else if (L || R) h = w / ratio; else w = h * ratio;
+    const ax = L ? 1 : R ? 0 : .5, ay = T ? 1 : B ? 0 : .5;
+    const fx = ax === 1 ? o.x + o.w : ax === 0 ? o.x : o.x + o.w / 2, fy = ay === 1 ? o.y + o.h : ay === 0 ? o.y : o.y + o.h / 2;
+    return anchored(fx, fy, ax, ay, w, h);
+  }
+
+  let drag = null;
+  stage.addEventListener('pointerdown', (e) => {
+    const handle = e.target.dataset?.h || (e.target === box ? 'move' : null);
+    if (!handle) return;
+    stage.setPointerCapture(e.pointerId);
+    const r = stage.getBoundingClientRect();
+    drag = { handle, o: { ...rect }, sx: (e.clientX - r.left) / k, sy: (e.clientY - r.top) / k };
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const r = stage.getBoundingClientRect();
+    const px = (e.clientX - r.left) / k, py = (e.clientY - r.top) / k;
+    if (drag.handle === 'move') {
+      rect = { ...drag.o, x: clamp(drag.o.x + px - drag.sx, 0, W - drag.o.w), y: clamp(drag.o.y + py - drag.sy, 0, H - drag.o.h) };
+    } else rect = resizeBy(drag.handle, drag.o, px, py);
+    draw();
+  });
+  const end = () => { drag = null; };
+  stage.addEventListener('pointerup', end); stage.addEventListener('pointercancel', end);
+
+  // Proporzioni: il rettangolo si adatta restando centrato
+  document.querySelectorAll('[data-r]').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-r]').forEach((x) => x.classList.toggle('on', x === b));
+    const v = b.dataset.r;
+    ratio = v === 'free' ? null : v.split(':')[0] / v.split(':')[1];
+    if (!ratio) return;
+    let w = rect.w, h = rect.h;
+    if (w / h > ratio) w = h * ratio; else h = w / ratio;
+    const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+    rect = anchored(cx, cy, .5, .5, w, h);
+    draw();
+  }));
+
+  function fromFields(changed) {
+    let w = clamp(+wIn.value || MIN, MIN, W), h = clamp(+hIn.value || MIN, MIN, H);
+    if (ratio) { if (changed === 'w') h = w / ratio; else w = h * ratio; }
+    const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+    const a = anchored(cx, cy, .5, .5, w, h);
+    rect = { ...a, x: clamp(a.x, 0, W - a.w), y: clamp(a.y, 0, H - a.h) };
+    draw();
+  }
+  wIn.addEventListener('input', () => fromFields('w'));
+  hIn.addEventListener('input', () => fromFields('h'));
+  [wIn, hIn].forEach((i) => i.addEventListener('blur', draw));
+
+  $('reset').addEventListener('click', () => { rect = { x: 0, y: 0, w: W, h: H }; if (ratio) document.querySelector('[data-r="free"]').click(); draw(); });
+  $('cancel').addEventListener('click', () => window.tool.close());
+  async function apply() {
+    $('apply').disabled = true; status.className = ''; status.textContent = 'Salvataggio…';
+    try {
+      const res = await window.tool.apply({ left: rect.x, top: rect.y, width: rect.w, height: rect.h, output: fp.get() });
+      status.textContent = '✓ Salvato: ' + res.outputs.map((o) => o.split(/[\\/]/).pop()).join(', ');
+      setTimeout(() => window.tool.close(), 1300);
+    } catch (e) { status.className = 'err'; status.textContent = String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''); $('apply').disabled = false; }
+  }
+  $('apply').addEventListener('click', apply);
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') window.tool.close(); else if (e.key === 'Enter') apply(); });
+
+  const fp = FormatPicker.mount($('fp'), { withSame: true });
+  window.tool.init().then(({ files, info, output }) => {
+    fp.set(output);
+    W = info.width; H = info.height;
+    $('name').textContent = `${files[0].split(/[\\/]/).pop()} — ${W} × ${H} px`;
+    $('img').onload = () => {
+      const fit = () => {
+        const wrap = $('wrap').getBoundingClientRect();
+        k = Math.min((wrap.width - 4) / W, (wrap.height - 4) / H);
+        stage.style.width = W * k + 'px'; stage.style.height = H * k + 'px';
+        draw();
+      };
+      rect = { x: 0, y: 0, w: W, h: H };
+      fit(); addEventListener('resize', fit);
+    };
+    $('img').src = info.dataUrl;
+  });
+</script>

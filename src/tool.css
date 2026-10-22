@@ -1,0 +1,31 @@
+/* Stile condiviso delle finestre di lavoro: vetro chiaro (l'acrilico di Windows sta dietro), pannelli traslucidi, accento rosso-arancio */
+:root { --accent: #e8502f; --ink: #2b1006; --line: rgba(90, 45, 15, .20); --panel: rgba(255, 255, 255, .42); --panel2: rgba(255, 255, 255, .62); --veil: rgba(255, 230, 200, .14); }
+* { box-sizing: border-box; }
+html { height: 100%; }
+html::before { content: ''; position: fixed; left: 0; right: 0; top: 0; height: 40px; -webkit-app-region: drag; z-index: 100; } /* trascinare la finestra */
+.titlebar-title { position: fixed; left: 16px; top: 0; height: 40px; line-height: 40px; font-weight: 700; font-size: 13px; letter-spacing: .02em; color: var(--ink); pointer-events: none; z-index: 101; }
+body { margin: 40px 0 0; height: calc(100% - 40px); background: var(--veil); color: var(--ink); font: 14px 'Segoe UI', sans-serif; user-select: none; display: flex; flex-direction: column; padding: 16px; gap: 12px; }
+h1 { font-size: 15px; margin: 0; font-weight: 700; }
+h1 small { font-weight: 400; opacity: .65; margin-left: 8px; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sp { flex: 1; }
+button, input, select { font: inherit; color: inherit; }
+button { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { background: var(--panel2); }
+button:disabled { opacity: .45; cursor: default; }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary { background: linear-gradient(#ea5638, #c9440f); border-color: #b93b0b; color: #fff; font-weight: 700; box-shadow: 0 1px 2px rgba(120, 40, 0, .35); }
+button.primary:hover { background: linear-gradient(#ee6247, #d04a14); }
+button.primary:disabled { opacity: .5; }
+input[type=number], input[type=text], select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, .6); }
+input[type=number] { width: 84px; }
+input[type=number]:focus, input[type=text]:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+select option, select optgroup { color: #2b1006; }
+label { display: inline-flex; align-items: center; gap: 6px; }
+input[type=checkbox], input[type=radio], input[type=range] { accent-color: var(--accent); }
+#status { min-height: 20px; font-size: 13px; opacity: .85; }
+#status.err { color: #c0260d; opacity: 1; }
+.fp { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fp input[type=range] { width: 90px; }
+.fp input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: transparent; cursor: pointer; }
+.fp output { opacity: .7; min-width: 2.2em; }
