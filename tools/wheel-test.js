@@ -5,12 +5,12 @@ const fs = require('fs');
 const path = require('path');
 
 const MIME = {
-  png: 'image/png', jpg: 'image/jpeg', pdf: 'application/pdf', gif: 'image/gif', xyz: '',
+  png: 'image/png', jpg: 'image/jpeg', pdf: 'application/pdf', gif: 'image/gif', xyz: '', zip: 'application/x-zip-compressed', exe: 'application/x-msdownload', json: 'application/json', md: 'text/markdown',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   mp4: 'video/mp4', mov: 'video/quicktime', mp3: 'audio/mpeg', wav: 'audio/wav', flac: 'audio/flac', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', csv: 'application/vnd.ms-excel', tsv: 'text/tab-separated-values',
 };
 const SCENARI = {
-  neutra: null, png: ['png'], pdf: ['pdf'], docx: ['docx'], 'docx+docx': ['docx', 'docx'], 'docx+pdf': ['docx', 'pdf'], 'png+pdf': ['png', 'pdf'], 'png+jpg': ['png', 'jpg'], sconosciuto: ['xyz'],
+  neutra: null, png: ['png'], pdf: ['pdf'], 'pdf+pdf': ['pdf', 'pdf'], zip: ['zip'], exe: ['exe'], json: ['json'], md: ['md'], 'png+exe': ['png', 'exe'], docx: ['docx'], 'docx+docx': ['docx', 'docx'], 'docx+pdf': ['docx', 'pdf'], 'png+pdf': ['png', 'pdf'], 'png+jpg': ['png', 'jpg'], sconosciuto: ['xyz'],
   mp4: ['mp4'], 'mp4+mov': ['mp4', 'mov'], 'mp4+png': ['mp4', 'png'],
   gif: ['gif'], tsv: ['tsv'], xlsx: ['xlsx'], 'xlsx+xlsx': ['xlsx', 'xlsx'], 'xlsx+3': ['xlsx', 'xlsx', 'xlsx'], 'csv(xls)': ['csv'],
   mp3: ['mp3'], 'mp3+mp4': ['mp3', 'mp4'], 'mp3+wav': ['mp3', 'wav'], 'mp3+mp4': ['mp3', 'mp4'],
