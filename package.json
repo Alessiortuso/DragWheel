@@ -1,6 +1,6 @@
 {
   "name": "dragwheel",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Ruota radiale per Windows: trascina un file tenendo premuto un tasto e scegli come convertirlo o modificarlo (immagini, PDF con modifica e firma digitale, video, audio, fogli di calcolo, DOCX, dati JSON/YAML/TOML/XML, Markdown, ZIP).",
   "author": "Alessio",
   "license": "MIT",
