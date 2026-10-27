@@ -16,7 +16,7 @@
   .hot ~ text { fill: #fff; }
   .ic { fill: none; stroke: #2b1006; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
   .hot ~ .ic { stroke: #fff; }
-  #msg { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); padding: 7px 16px; border-radius: 999px; white-space: nowrap;
+  #msg { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); padding: 7px 16px; border-radius: 999px; white-space: normal; text-align: center; width: max-content; max-width: 580px;
          background: linear-gradient(#f6cc88, #f2af9a); color: #2b1006; font-weight: 700; font-size: 13px; letter-spacing: .03em;
          border: 1.5px solid rgba(255, 246, 228, .7); box-shadow: 0 4px 12px rgba(80, 25, 0, .35); opacity: 0; transition: opacity .15s; }
   #msg.on { opacity: 1; }
@@ -32,12 +32,17 @@
   const VID_ACTIONS = ['vid:compress', 'vid:resize', 'vid:cut', 'vid:frames', 'aud:split']; // aud:split = separa voce e musica dall'audio del video
   const AUDIO_TARGETS = ['mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus', 'aac', 'aiff', 'wma'];
   const AUD_ACTIONS = ['aud:cut', 'aud:merge', 'aud:volume', 'aud:split'];
-  const SHEET_TARGETS = ['xlsx', 'xls', 'ods', 'csv', 'tsv', 'json', 'html', 'pdf'];
+  const SHEET_TARGETS = ['xlsx', 'xls', 'ods', 'csv', 'tsv', 'json', 'html', 'pdf', 'sql'];
   const XL_ACTIONS = ['xl:split', 'xl:merge', 'xl:clean', 'xl:diff'];
   const DOC_TARGETS = ['pdf', 'txt', 'html', 'md', 'images'];
   const DX_ACTIONS = ['dx:merge', 'dx:compress', 'dx:clean', 'dx:replace'];
-  const SINGLE_ONLY = new Set(['crop', 'vid:cut', 'vid:frames', 'aud:cut']); // azioni che lavorano su un file alla volta
-  const LABEL = { crop: 'Ritaglia', resize: 'Ridimensiona', removebg: 'Rimuovi\nsfondo', 'vid:compress': 'Comprimi', 'vid:resize': 'Ridimensiona', 'vid:cut': 'Taglia', 'vid:frames': 'Fotogrammi', 'aud:cut': 'Taglia', 'aud:merge': 'Unisci', 'aud:volume': 'Volume', 'aud:split': 'Voce e\nmusica', 'xl:split': 'Dividi', 'xl:merge': 'Unisci', 'xl:clean': 'Pulisci', 'xl:diff': 'Confronta', 'dx:merge': 'Unisci', 'dx:compress': 'Comprimi', 'dx:clean': 'Pulisci', 'dx:replace': 'Sostituisci' };
+  const DATA_FORMATS = ['json', 'yaml', 'toml', 'xml'];
+  const DATA_ACTIONS = { json: ['data:format', 'data:minify', 'data:validate', 'data:types'], yaml: ['data:format', 'data:validate', 'data:types'], toml: ['data:format', 'data:validate', 'data:types'], xml: ['data:format', 'data:minify', 'data:validate'] };
+  const dat = (t) => ({ id: 'data:convert:' + t, label: t.toUpperCase() });
+  const PDF_ACTIONS = ['pdf:edit', 'pdf:pages', 'pdf:merge', 'pdf:sign', 'pdf:protect', 'pdf:compress'];
+  const SINGLE_ONLY = new Set(['crop', 'vid:cut', 'vid:frames', 'aud:cut', 'pdf:edit', 'pdf:pages']); // azioni che lavorano su un file alla volta
+  const MULTI_ONLY = new Set(['pdf:merge']); // azioni che servono solo con più file
+  const LABEL = { crop: 'Ritaglia', resize: 'Ridimensiona', removebg: 'Rimuovi\nsfondo', 'vid:compress': 'Comprimi', 'vid:resize': 'Ridimensiona', 'vid:cut': 'Taglia', 'vid:frames': 'Fotogrammi', 'aud:cut': 'Taglia', 'aud:merge': 'Unisci', 'aud:volume': 'Volume', 'aud:split': 'Voce e\nmusica', 'xl:split': 'Dividi', 'xl:merge': 'Unisci', 'xl:clean': 'Pulisci', 'xl:diff': 'Confronta', 'dx:merge': 'Unisci', 'dx:compress': 'Comprimi', 'dx:clean': 'Pulisci', 'dx:replace': 'Sostituisci', 'pdf:edit': 'Modifica', 'pdf:pages': 'Pagine', 'pdf:merge': 'Unisci', 'pdf:sign': 'Firma', 'pdf:protect': 'Proteggi', 'pdf:compress': 'Comprimi', 'data:format': 'Formatta', 'data:minify': 'Minifica', 'data:validate': 'Valida', 'data:types': 'Tipi TS\ne schema', 'zip:create': 'Comprimi\nin ZIP', 'zip:extract': 'Estrai' };
   const T = (id) => ({ id, label: id.toUpperCase() });
   const vt = (t) => ({ id: 'vid:convert:' + t, label: t.toUpperCase() });
   const at = (t) => ({ id: 'aud:convert:' + t, label: t.toUpperCase() });
@@ -54,6 +59,8 @@
     'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/wave': 'wav', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx', 'application/vnd.ms-excel.sheet.macroenabled.12': 'xlsx',
     'application/vnd.ms-excel': 'xls', 'application/vnd.oasis.opendocument.spreadsheet': 'ods', 'text/csv': 'csv', 'text/tab-separated-values': 'tsv',
+    'application/json': 'json', 'text/json': 'json', 'application/xml': 'xml', 'text/xml': 'xml', 'application/yaml': 'yaml', 'application/x-yaml': 'yaml', 'text/yaml': 'yaml', 'text/x-yaml': 'yaml', 'application/toml': 'toml',
+    'text/markdown': 'md', 'text/x-markdown': 'md', 'text/html': 'html', 'application/zip': 'zip', 'application/x-zip-compressed': 'zip', 'application/x-zip': 'zip',
     'audio/flac': 'flac', 'audio/x-flac': 'flac', 'audio/ogg': 'ogg', 'audio/opus': 'opus', 'audio/x-ms-wma': 'wma', 'audio/aiff': 'aiff', 'audio/x-aiff': 'aiff',
   };
   // Windows non sempre indica il tipo durante il trascinamento (per esempio per MKV): al rilascio si usa l'estensione
@@ -61,6 +68,7 @@
     png: 'png', jpg: 'jpg', jpeg: 'jpg', webp: 'webp', avif: 'avif', tif: 'tiff', tiff: 'tiff', bmp: 'bmp', gif: 'gif', svg: 'svg', pdf: 'pdf', docx: 'docx',
     mp4: 'mp4', m4v: 'mp4', mov: 'mov', webm: 'webm', mkv: 'mkv', avi: 'avi', wmv: 'wmv', flv: 'flv', mpg: 'mpg', mpeg: 'mpg', '3gp': '3gp', ts: 'ts', mts: 'ts', m2ts: 'ts', ogv: 'ogv',
     xlsx: 'xlsx', xlsm: 'xlsx', xls: 'xls', ods: 'ods', csv: 'csv', tsv: 'tsv',
+    json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml', xml: 'xml', md: 'md', markdown: 'md', html: 'html', htm: 'html', zip: 'zip',
     mp3: 'mp3', m4a: 'm4a', m4b: 'm4a', aac: 'aac', wav: 'wav', flac: 'flac', ogg: 'ogg', oga: 'ogg', opus: 'opus', wma: 'wma', aif: 'aiff', aiff: 'aiff',
   };
   const VIDEO_KINDS = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi', 'wmv', 'flv', 'mpg', '3gp', 'ts', 'ogv']);
@@ -73,21 +81,39 @@
     if (AUDIO_KINDS.has(kind)) return { targets: AUDIO_TARGETS.filter((t) => t !== kind).map(at), actions: AUD_ACTIONS };
     if (SHEET_KINDS.has(kind)) return { targets: SHEET_TARGETS.filter((t) => t !== kind).map(xt), actions: XL_ACTIONS };
     if (kind === 'gif') return { targets: [...IMG_TARGETS.filter((t) => t !== 'gif').map(T), vt('mp4'), vt('webm')], actions: IMG_ACTIONS };
-    if (kind === 'pdf') return { targets: ['png', 'webp', 'jpg', 'tiff', 'avif', 'bmp', 'gif', 'docx', 'txt'].map(T), actions: [] };
+    if (kind === 'pdf') return { targets: ['png', 'webp', 'jpg', 'tiff', 'avif', 'bmp', 'gif', 'docx', 'txt'].map(T), actions: PDF_ACTIONS };
     if (kind === 'docx') return { targets: DOC_TARGETS.map(dt), actions: DX_ACTIONS };
+    if (DATA_ACTIONS[kind]) return { targets: [...DATA_FORMATS, 'csv', 'sql'].filter((t) => t !== kind && !(kind === 'xml' && t === 'sql')).map(dat), actions: DATA_ACTIONS[kind] };
+    if (kind === 'md') return { targets: [{ id: 'web:html', label: 'HTML' }, { id: 'web:pdf', label: 'PDF' }], actions: [] };
+    if (kind === 'html') return { targets: [{ id: 'web:pdf', label: 'PDF' }], actions: [] };
+    if (kind === 'zip') return { targets: [], actions: ['zip:extract'] };
     return { targets: IMG_TARGETS.filter((f) => f !== kind).map(T), actions: IMG_ACTIONS }; // immagini
   }
-  // più file: solo ciò che vale per tutti. Nessun tipo noto: si mostra il set delle immagini (l'errore, se c'è, arriva al rilascio)
+  // Stato senza opzioni: la pillola al centro dice perché (pill) e il messaggio in basso lo spiega (note)
+  const none = (pill, note) => ({ targets: [], actions: [], pill, note });
+  // più file (tutti di tipo noto): solo ciò che vale per tutti
   function optionsForKinds(kinds, count) {
-    if (!kinds.length) return { targets: IMG_TARGETS.map(T), actions: IMG_ACTIONS };
     const all = kinds.map(optionsFor);
-    return {
-      label: [...new Set(kinds)].map((k) => k.toUpperCase()).join(' + '),
+    const label = [...new Set(kinds)].map((k) => k.toUpperCase()).join(' + ');
+    const o = {
+      label,
       targets: all[0].targets.filter((t) => all.every((o) => o.targets.some((x) => x.id === t.id))),
-      actions: all[0].actions.filter((a) => all.every((o) => o.actions.includes(a)) && (!SINGLE_ONLY.has(a) || count === 1) && (a !== 'xl:diff' || count === 2)),
+      actions: all[0].actions.filter((a) => all.every((o) => o.actions.includes(a)) && (!SINGLE_ONLY.has(a) || count === 1) && (!MULTI_ONLY.has(a) || count > 1) && (a !== 'xl:diff' || count === 2)),
     };
+    return o.targets.length || o.actions.length ? o : none([label, 'nessuna opzione', 'in comune'], `${label}: insieme non hanno opzioni in comune, trascinali separatamente`);
   }
-  const optionsForTypes = (mimes) => optionsForKinds(mimes.map((m) => KIND_BY_MIME[m]).filter(Boolean), mimes.length);
+  // Durante il trascinamento si conosce solo il tipo annunciato da Windows (MIME). Per le cartelle e per alcuni file
+  // non c'è: la ruota non propone nulla e il controllo vero (cartella? estensione?) si fa al rilascio, in checkDrop.
+  function optionsForTypes(mimes) {
+    if (!mimes.length) return null;
+    if (mimes.some((m) => !m)) return none(['Rilascia qui', 'per controllare'], 'Windows non dice che cosa stai trascinando (forse una cartella): rilascia per controllare');
+    const kinds = mimes.map((m) => KIND_BY_MIME[m]);
+    if (kinds.some((k) => !k)) {
+      const what = [...new Set(mimes.filter((m, i) => !kinds[i]).map((m) => m.split('/').pop().replace(/^(x-|vnd\.)/, '').split(/[.+-]/)[0].toUpperCase()))].join(', ');
+      return none(['Formato non', 'supportato'], `${what}: formato non supportato da DragWheel`);
+    }
+    return optionsForKinds(kinds, mimes.length);
+  }
   const kindOfPath = (p) => KIND_BY_EXT[(String(p).split('.').pop() || '').toLowerCase()];
 
   // --- Geometria e aspetto -------------------------------------------------------------------------
@@ -145,6 +171,18 @@
     'aud:merge': ['M11 12H3', 'M16 6H3', 'M16 18H3', 'M18 9v6', 'M21 12h-6'],
     'aud:split': ['M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z', 'M19 10v1a7 7 0 0 1-14 0v-1', 'M12 18v4', 'M8 22h8'],
     'aud:volume': ['M11 5L6 9H2v6h4l5 4V5z', 'M15.5 8.5a5 5 0 0 1 0 7', 'M19 5a10 10 0 0 1 0 14'],
+    'pdf:edit': ['M12 20h9', 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z'],
+    'pdf:pages': ['M12 2l10 5-10 5L2 7z', 'M2 17l10 5 10-5', 'M2 12l10 5 10-5'],
+    'pdf:merge': ['M8 6l4-4 4 4', 'M12 2v10.3a4 4 0 0 1-1.17 2.87L4 22', 'M20 22l-5-5'],
+    'pdf:sign': ['M3 17c3-3 5-9 7-9s-1 9 2 9 3-4 5-4 2 3 4 3', 'M3 21h18'],
+    'pdf:protect': ['M5 11h14v10H5z', 'M8 11V7a4 4 0 0 1 8 0v4', 'M12 15v2'],
+    'pdf:compress': ['M4 14h6v6', 'M20 10h-6V4', 'M14 10l7-7', 'M3 21l7-7'],
+    'data:format': ['M21 10H7', 'M21 6H3', 'M21 14H3', 'M21 18H7'],
+    'data:minify': ['M4 14h6v6', 'M20 10h-6V4', 'M14 10l7-7', 'M3 21l7-7'],
+    'data:validate': ['M22 11.1V12a10 10 0 1 1-5.9-9.1', 'M22 4L12 14l-3-3'],
+    'data:types': ['M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1', 'M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1'],
+    'zip:create': ['M21 8v13H3V8', 'M1 3h22v5H1z', 'M10 12h4'],
+    'zip:extract': ['M21 8v13H3V8', 'M1 3h22v5H1z', 'M12 11v6', 'M9 14l3 3 3-3'],
     'vid:frames': ['M4 7.5h3l1.8-2.5h6.4L17 7.5h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z', 'M12 16.2a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2z'],
   };
   function icon(id, cx, cy, size, parent) {
@@ -212,40 +250,59 @@
 
   // Bottone centrale a pillola con una o due righe di testo (stati senza azioni)
   function pill(lines, parent) {
-    const h = 30 + lines.length * 19, w = 180;
+    const longest = Math.max(...lines.map((t) => t.length)), size = Math.min(16, 196 / (longest * 0.74)); // il testo resta dentro il cerchio
+    const h = 30 + lines.length * size * 1.18, w = Math.min(226, Math.max(180, longest * size * 0.74 + 34));
     const g = el('g', {}, parent);
-    el('rect', { x: C - w / 2, y: C - h / 2, width: w, height: h, rx: h / 2, class: 'cseg', style: 'pointer-events:none' }, g);
-    lines.forEach((t, i) => { el('text', { x: C, y: C + (i - (lines.length - 1) / 2) * 18, class: 't-pill' }, g).textContent = t.toUpperCase(); });
+    el('rect', { x: C - w / 2, y: C - h / 2, width: w, height: h, rx: Math.min(h, w) / 2, class: 'cseg', style: 'pointer-events:none' }, g);
+    lines.forEach((t, i) => { el('text', { x: C, y: C + (i - (lines.length - 1) / 2) * size * 1.12, class: 't-pill', style: `font-size:${size.toFixed(1)}px` }, g).textContent = t.toUpperCase(); });
   }
 
   // Esegue l'azione/conversione scelta sui file (rilasciati o in attesa di un clic)
   async function run(files, id) {
-    toast(id.startsWith('vid:') || id.startsWith('aud:') || id.startsWith('xl:') || id.startsWith('dx:') || ['crop', 'resize', 'removebg'].includes(id) ? 'Apro lo strumento…' : 'Conversione…', 120000);
+    toast(id.startsWith('vid:') || id.startsWith('aud:') || id.startsWith('xl:') || id.startsWith('dx:') || id.startsWith('pdf:') || ['crop', 'resize', 'removebg'].includes(id) ? 'Apro lo strumento…'
+      : id === 'zip:create' ? 'Creo lo ZIP…' : id === 'zip:extract' ? 'Estraggo…' : id === 'data:validate' ? 'Controllo…' : 'Conversione…', 600000);
     const res = await window.api.convert(files, id);
     const ok = res.filter((r) => r.outputs).length;
     const err = res.find((r) => r.error);
     if (res.every((r) => r.opened)) return toast('Apro lo strumento…', 1500);
-    toast(err ? `${ok}/${res.length} ok — ${err.error}` : `✓ ${ok} file pronti`, 3500);
+    const short = (p) => String(p).split(/[\\/]/).pop();
+    const msgs = res.filter((r) => r.message).map((r) => (res.length > 1 ? short(r.file) + ': ' : '') + r.message);
+    if (msgs.length) return toast(msgs.join(' · ') + (err ? ` · ${err.error}` : ''), 7000);
+    const made = res.flatMap((r) => r.outputs || []);
+    toast(err ? `${ok}/${res.length} ok — ${err.error}` : made.length === 1 ? `✓ ${short(made[0])}` : `✓ ${made.length} file pronti`, 4000);
   }
 
-  // File rilasciato su un'opzione che non vale per il suo tipo (il tipo annunciato durante il trascinamento era sbagliato
-  // o mancante): la ruota si ridisegna con le opzioni giuste e basta un clic per applicarle
+  // Al rilascio i percorsi sono certi: cartelle e formati non supportati si dicono chiaramente e non si propone nulla.
+  // id: opzione su cui è stato rilasciato il file (null = fuori dalle opzioni). Se vale per i file, si esegue; se no la
+  // ruota si ridisegna con le opzioni giuste e basta un clic per applicarle (il tipo annunciato era sbagliato o mancante).
   let pending = null;
-  function mismatch(files) {
+  function refuse(o) { pending = null; sig = 'pending'; render(o); window.api.hold(6000); toast(o.note, 6000); }
+  async function checkDrop(files, id) {
+    if (!files.length) return toast('Nessun file ricevuto dal rilascio', 4000);
+    const types = await window.api.pathKinds(files);
+    const dirs = files.filter((f, i) => types[i] === 'dir');
+    if (dirs.length) { // cartelle (anche insieme a file): l'unica cosa possibile è comprimerle in uno ZIP
+      const label = dirs.length === files.length ? (dirs.length > 1 ? `${dirs.length} cartelle` : 'Cartella') : 'Cartelle e file';
+      if (id === 'zip:create') return run(files, id);
+      pending = files; sig = 'pending';
+      render({ label, targets: [], actions: ['zip:create'] });
+      window.api.hold(10000);
+      return toast(`${label}: clicca “Comprimi in ZIP” (con le cartelle si può fare solo questo)`, 9000);
+    }
     const kinds = files.map(kindOfPath);
-    const o = optionsForKinds(kinds.filter(Boolean), files.length);
+    const bad = files.filter((f, i) => !kinds[i]);
+    if (bad.length) {
+      const ext = [...new Set(bad.map((f) => { const n = String(f).split(/[\\/]/).pop(); return n.includes('.') ? '.' + n.split('.').pop().toLowerCase() : n; }))].join(', ');
+      return refuse(none(['Formato non', 'supportato'], `${ext}: formato non supportato da DragWheel${files.length > bad.length ? ' (togli questi file e riprova)' : ''}`));
+    }
+    const o = optionsForKinds(kinds, files.length);
+    if (!o.targets.length && !o.actions.length) return refuse(o);
+    if (id && (o.targets.some((t) => t.id === id) || o.actions.includes(id))) return run(files, id);
     pending = files; sig = 'pending';
     render(o);
-    if (!o.targets.length && !o.actions.length) { pending = null; return toast('Formato non supportato', 4000); }
     window.api.hold(10000);
     toast(`È un file ${o.label || ''}: clicca l’opzione che vuoi`, 9000);
   }
-  const valid = (id, files) => {
-    const kinds = files.map(kindOfPath);
-    if (kinds.some((k) => !k)) return true; // estensione sconosciuta: ci pensa il programma a dare l'errore
-    const o = optionsForKinds(kinds, files.length);
-    return o.targets.some((t) => t.id === id) || o.actions.includes(id);
-  };
 
   function target(node, id) {
     node.addEventListener('dragenter', (e) => { e.preventDefault(); node.classList.add('hot'); });
@@ -256,9 +313,7 @@
       node.classList.remove('hot');
       const files = window.api.takeDropPaths();
       window.api.log(`drop su ${id}: files=${e.dataTransfer.files.length} types=${[...e.dataTransfer.types]} paths=${JSON.stringify(files)}`);
-      if (!files.length) return toast('Nessun file ricevuto dal rilascio', 4000);
-      if (!valid(id, files)) return mismatch(files);
-      run(files, id);
+      checkDrop(files, id);
     });
     node.addEventListener('click', () => { if (pending) { const f = pending; pending = null; run(f, id); } });
   }
@@ -302,7 +357,7 @@
         target(seg, a);
       });
     } else {
-      pill(!opts ? ['Trascina', 'un file'] : n ? [opts.label || ''] : [opts.label || 'Formato', 'non supportato'], w);
+      pill(!opts ? ['Trascina', 'un file'] : opts.pill || [opts.label || ''], w);
     }
   }
 
@@ -315,11 +370,21 @@
     if (s === sig) return;
     sig = s;
     window.api.log(`tipi in arrivo: ${JSON.stringify(mimes)}`);
-    render(optionsForTypes(mimes));
+    const o = optionsForTypes(mimes);
+    render(o);
+    if (o && o.note) toast(o.note, 5000);
   }
   document.addEventListener('dragenter', onDrag);
   document.addEventListener('dragover', (e) => { e.preventDefault(); onDrag(e); });
-  window.api.onReset(() => { sig = null; pending = null; render(null); });
+  // rilascio fuori dalle opzioni (sulla pillola centrale o sul bordo): si controlla comunque che cosa è stato trascinato
+  document.addEventListener('drop', (e) => {
+    if (e.defaultPrevented) return; // già gestito da un'opzione
+    e.preventDefault();
+    const files = window.api.takeDropPaths();
+    window.api.log(`drop fuori dalle opzioni: paths=${JSON.stringify(files)}`);
+    checkDrop(files, null);
+  });
+  window.api.onReset(() => { sig = null; pending = null; msg.classList.remove('on'); render(null); });
   window.api.onGlass((url) => { glassUrl = url; render(lastOpts); }); // arriva subito dopo il reset, prima che la ruota sia visibile
 
   let timer;

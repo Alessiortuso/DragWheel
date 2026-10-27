@@ -101,14 +101,15 @@ function csvText(ws, o = {}) {
   return (o.bom === false ? '' : '﻿') + rows.map((r) => r.map(field).join(d)).join('\r\n') + '\r\n';
 }
 
-function jsonRows(ws) {
+// raw: le date restano Date (per l'SQL); altrimenti diventano testo come nel foglio
+function jsonRows(ws, { raw = false } = {}) {
   const m = matrix(ws), h = headerRowOf(m), head = [], seen = new Map();
   (m[h] || []).forEach((v, i) => {
     let k = isEmptyVal(v) ? `colonna ${i + 1}` : String(v).trim();
     if (seen.has(k)) { const n = seen.get(k) + 1; seen.set(k, n); k = `${k}_${n}`; } else seen.set(k, 1);
     head.push(k);
   });
-  return m.slice(h + 1).filter((r) => r.some((v) => !isEmptyVal(v))).map((r) => Object.fromEntries(head.map((k, i) => [k, r[i] instanceof Date ? dateText(r[i]) : isEmptyVal(r[i]) ? null : r[i]])));
+  return m.slice(h + 1).filter((r) => r.some((v) => !isEmptyVal(v))).map((r) => Object.fromEntries(head.map((k, i) => [k, r[i] instanceof Date && !raw ? dateText(r[i]) : isEmptyVal(r[i]) ? null : r[i]])));
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

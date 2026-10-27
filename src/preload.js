@@ -10,6 +10,7 @@ document.addEventListener('drop', (e) => {
 contextBridge.exposeInMainWorld('api', {
   takeDropPaths: () => { const p = lastDrop; lastDrop = []; return p; },
   convert: (files, fmt) => ipcRenderer.invoke('convert', files, fmt),
+  pathKinds: (paths) => ipcRenderer.invoke('pathKinds', paths),
   log: (m) => ipcRenderer.send('log', String(m)),
   onGlass: (cb) => ipcRenderer.on('glass', (_e, url) => cb(url)),
   onReset: (cb) => ipcRenderer.on('reset', () => cb()),

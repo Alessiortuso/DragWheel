@@ -194,7 +194,7 @@
   // ---------------- converti ----------------
   function convPanel() {
     const ext = extOf(files[0]), kind = KIND[ext], own = ext === 'xlsm' ? 'xlsm' : kind === 'csv' ? (ext === 'tsv' ? 'tsv' : 'csv') : kind, sel = $('cvTarget'), keep = sel.value;
-    sel.innerHTML = [['xlsx', 'XLSX (Excel)'], ['xls', 'XLS (Excel 97-2003)'], ['ods', 'ODS (LibreOffice)'], ['csv', 'CSV (testo con separatori)'], ['tsv', 'TSV (testo con tabulazioni)'], ['json', 'JSON'], ['html', 'HTML (pagina web)'], ['pdf', 'PDF']].filter(([k]) => k !== own).map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
+    sel.innerHTML = [['xlsx', 'XLSX (Excel)'], ['xls', 'XLS (Excel 97-2003)'], ['ods', 'ODS (LibreOffice)'], ['csv', 'CSV (testo con separatori)'], ['tsv', 'TSV (testo con tabulazioni)'], ['json', 'JSON'], ['html', 'HTML (pagina web)'], ['pdf', 'PDF'], ['sql', 'SQL (CREATE TABLE e INSERT)']].filter(([k]) => k !== own).map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
     if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
     const t = sel.value, many = info && info.sheets && info.sheets.filter((s) => !s.hidden).length > 1;
     $('csvOpts').style.display = t === 'csv' ? 'contents' : 'none';

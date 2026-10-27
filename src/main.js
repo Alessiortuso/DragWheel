@@ -9,6 +9,10 @@ const { openVideoTool } = require('./video-tool');
 const { openAudioTool } = require('./audio-tool');
 const { openSheetTool } = require('./sheet-tool');
 const { openDocTool } = require('./doc-tool');
+const { openPdfTool } = require('./pdf-tool');
+const dataOps = require('./data/ops');
+const webDocs = require('./web-docs');
+const archive = require('./archive');
 const bgClient = require('./bg/client');
 
 const SIZE = 620;
@@ -99,6 +103,27 @@ function startGlobalHook() {
 }
 
 ipcMain.handle('convert', async (_e, files, fmt) => {
+  if (/^(data|web|zip):/.test(fmt)) { // operazioni rapide senza finestra: dati, documentazione, ZIP
+    busy++;
+    log(`${fmt}: ${JSON.stringify(files)}`);
+    const results = [];
+    const one = async (file, fn) => { try { results.push({ file, ...(await fn()) }); } catch (err) { log(`errore ${file}: ${err.stack}`); results.push({ file, error: err.message }); } };
+    try {
+      const [group, op, target] = fmt.split(':');
+      if (fmt === 'zip:create') await one(files[0], () => archive.zipPaths(files)); // tutto in un solo archivio
+      else for (const f of files) {
+        if (group === 'zip') await one(f, () => archive.extract(f));
+        else if (group === 'web') await one(f, () => webDocs.convert(f, op));
+        else await one(f, () => (op === 'convert' ? dataOps.convert(f, target) : dataOps[op](f)));
+      }
+    } finally { busy--; hideWheel(results.some((r) => r.message || r.error) ? 6000 : 1800); }
+    return results;
+  }
+  if (fmt.startsWith('pdf:')) { // strumenti PDF (modifica, pagine, firma, password, compressione): finestra propria
+    log(`strumento ${fmt}: ${JSON.stringify(files)}`);
+    try { await openPdfTool(files, fmt); hideWheel(300); return files.map((file) => ({ file, outputs: [], opened: true })); }
+    catch (err) { log(`errore ${fmt}: ${err.stack}`); hideWheel(2500); return [{ file: files[0], error: err.message }]; }
+  }
   if (fmt.startsWith('dx:')) { // strumenti per documenti Word: finestra propria
     log(`strumento ${fmt}: ${JSON.stringify(files)}`);
     try { await openDocTool(files, fmt); hideWheel(300); return files.map((file) => ({ file, outputs: [], opened: true })); }
@@ -143,6 +168,11 @@ ipcMain.handle('convert', async (_e, files, fmt) => {
   }
   return results;
 });
+
+// Per ogni percorso rilasciato sulla ruota: 'dir' (cartella), 'file' o 'missing'
+ipcMain.handle('pathKinds', (_e, paths) => (Array.isArray(paths) ? paths : []).map((p) => {
+  try { return fs.statSync(String(p)).isDirectory() ? 'dir' : 'file'; } catch { return 'missing'; }
+}));
 
 ipcMain.on('hide', () => hideWheel(0));
 // La ruota resta aperta per qualche secondo (es. quando va riproposta dopo un rilascio non valido)

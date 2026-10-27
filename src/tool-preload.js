@@ -56,3 +56,21 @@ contextBridge.exposeInMainWorld('sheet', {
   open: (p) => ipcRenderer.send('sheet:open', p),
   onProgress: (cb) => ipcRenderer.on('sheet:progress', (_e, m) => cb(m)),
 });
+
+contextBridge.exposeInMainWorld('pdf', {
+  init: () => ipcRenderer.invoke('pdf:init'),
+  bytes: (src) => ipcRenderer.invoke('pdf:bytes', src),
+  add: () => ipcRenderer.invoke('pdf:add'),
+  blank: (w, h) => ipcRenderer.invoke('pdf:blank', w, h),
+  image: () => ipcRenderer.invoke('pdf:image'),
+  sigs: () => ipcRenderer.invoke('pdf:sigs'),
+  sigSave: (b64) => ipcRenderer.invoke('pdf:sigSave', b64),
+  sigDelete: (id) => ipcRenderer.invoke('pdf:sigDelete', id),
+  certs: () => ipcRenderer.invoke('pdf:certs'),
+  pfx: () => ipcRenderer.invoke('pdf:pfx'),
+  verify: (src) => ipcRenderer.invoke('pdf:verify', src),
+  run: (op, state, options) => ipcRenderer.invoke('pdf:run', op, state, options),
+  reveal: (p) => ipcRenderer.send('pdf:reveal', p),
+  open: (p) => ipcRenderer.send('pdf:open', p),
+  onProgress: (cb) => ipcRenderer.on('pdf:progress', (_e, m) => cb(m)),
+});

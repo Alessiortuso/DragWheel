@@ -1,7 +1,7 @@
 {
   "name": "dragwheel",
   "version": "0.3.0",
-  "description": "Ruota radiale per Windows: trascina un file tenendo premuto un tasto e scegli come convertirlo o modificarlo (immagini, PDF, video, audio, fogli di calcolo, DOCX).",
+  "description": "Ruota radiale per Windows: trascina un file tenendo premuto un tasto e scegli come convertirlo o modificarlo (immagini, PDF con modifica e firma digitale, video, audio, fogli di calcolo, DOCX, dati JSON/YAML/TOML/XML, Markdown, ZIP).",
   "author": "Alessio",
   "license": "MIT",
   "private": true,
@@ -20,9 +20,12 @@
     "test:audio": "node tools/test-audio.js",
     "test:sheet": "node tools/test-sheet.js",
     "test:doc": "node tools/test-doc.js",
+    "test:pdf": "node tools/test-pdf.js",
+    "test:wheel": "electron tools/test-wheel-drop.js",
+    "test:dev": "electron tools/test-dev.js",
     "test:separate": "node tools/test-separate.js && electron tools/test-audio-split-ui.js",
     "test:matrix": "node tools/test-matrix.js && electron tools/test-matrix-electron.js",
-    "test:all": "npm test && npm run test:audio && npm run test:video && npm run test:sheet && npm run test:doc && npm run test:matrix && npm run test:separate",
+    "test:all": "npm test && npm run test:audio && npm run test:video && npm run test:sheet && npm run test:doc && npm run test:pdf && npm run test:wheel && npm run test:dev && npm run test:matrix && npm run test:separate",
     "icon": "node tools/make-icon.js",
     "dist": "npm run get-models && electron-builder --win nsis"
   },
@@ -31,14 +34,20 @@
     "@xmldom/xmldom": "^0.9.12",
     "docx": "^9.13.0",
     "exceljs": "^4.4.0",
+    "fast-xml-parser": "^5.11.2",
     "ffmpeg-static": "^5.3.0",
     "mammoth": "^1.13.0",
+    "marked": "^18.1.2",
     "onnxruntime-node": "^1.30.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
     "sharp": "^0.35.5",
+    "smol-toml": "^1.9.1",
     "uiohook-napi": "^1.5.5",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "yaml": "^2.9.1",
+    "yauzl": "^3.4.0",
+    "yazl": "^3.3.1"
   },
   "devDependencies": {
     "electron": "^45.0.0",
@@ -69,7 +78,8 @@
       "node_modules/sharp/**",
       "node_modules/@img/**",
       "node_modules/uiohook-napi/**",
-      "src/doc/word.ps1"
+      "src/doc/word.ps1",
+      "src/pdf/sign.ps1"
     ],
     "extraResources": [
       {

@@ -58,6 +58,11 @@ async function convert(file, o = {}) {
       const out = uniquePath(dir, base, 'json');
       fs.writeFileSync(out, JSON.stringify(sheets.length === 1 ? B.jsonRows(sheets[0]) : Object.fromEntries(sheets.map((ws) => [ws.name, B.jsonRows(ws)])), null, 2), 'utf8'); outputs.push(out);
     } else for (const ws of sheets) { const out = uniquePath(dir, `${base} - ${safeName(ws.name)}`, 'json'); fs.writeFileSync(out, JSON.stringify(B.jsonRows(ws), null, 2), 'utf8'); outputs.push(out); }
+  } else if (t === 'sql') {
+    const D = require('../data/ops');
+    const tables = sheets.map((ws) => { const rows = B.jsonRows(ws, { raw: true }); return { name: D.tableName(sheets.length === 1 ? base : ws.name), cols: [...new Set(rows.flatMap(Object.keys))], rows: rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v === null ? null : plain(v)]))) }; });
+    const out = uniquePath(dir, base, 'sql'); fs.writeFileSync(out, D.toSql(tables), 'utf8'); outputs.push(out);
+    notes.push(`${tables.map((x) => `Tabella “${x.name}” (${x.rows.length} righe)`).join(', ')}. Nomi tra virgolette doppie, come vuole lo standard SQL (per MySQL attiva ANSI_QUOTES).`);
   } else if (t === 'html') {
     const out = uniquePath(dir, base, 'html'); fs.writeFileSync(out, B.htmlText(wb, base), 'utf8'); outputs.push(out);
   } else throw new Error(`formato di uscita sconosciuto: ${t}`);
